@@ -25,3 +25,19 @@ router.get('/my', authenticate, requirePermission('MANAGE_THEATRE'), async (req,
 });
 
 export default router;
+// Public customer routes
+router.get('/', async (req, res, next) => {
+  try {
+    const theatres = await prisma.theatre.findMany({ where: { status: 'ACTIVE' } });
+    res.json({ success: true, data: theatres });
+  } catch (err) { next(err); }
+});
+
+
+router.get('/:id/shows', async (req, res, next) => {
+  try {
+    const shows = await prisma.show.findMany({ where: { screen: { theatreId: req.params.id }, startTime: { gte: new Date() } }, include: { movie: true, screen: true }, orderBy: { startTime: 'asc' } });
+    res.json({ success: true, data: shows });
+  } catch (err) { next(err); }
+});
+

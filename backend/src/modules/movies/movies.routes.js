@@ -4,6 +4,14 @@ import { AppError } from '../../middleware/error.middleware.js';
 
 const router = Router();
 
+router.get('/search', async (req, res, next) => {
+  try {
+    const q = req.query.q || '';
+    const movies = await prisma.movie.findMany({ where: { title: { contains: q, mode: 'insensitive' } } });
+    res.json({ success: true, data: movies });
+  } catch (err) { next(err); }
+});
+
 router.get('/', async (req, res, next) => {
   try {
     const movies = await prisma.movie.findMany();

@@ -140,6 +140,9 @@ router.post('/', authenticate, requirePermission('CREATE_SHOW'), enforceTenantSc
 
     if (data.startTime >= data.endTime) throw new AppError(400, 'Invalid time range');
 
+    const overlap = await prisma.show.findFirst({ where: { screenId: data.screenId, OR: [{ AND: [{ startTime: { lte: data.startTime } }, { endTime: { gt: data.startTime } }] }, { AND: [{ startTime: { lt: data.endTime } }, { endTime: { gte: data.endTime } }] }, { AND: [{ startTime: { gte: data.startTime } }, { endTime: { lte: data.endTime } }] }] } });
+    if (overlap) throw new AppError(409, 'Show time overlaps with an existing show on this screen', 'SHOW_OVERLAP');
+
     const show = await prisma.show.create({ data });
     
     // Create show_seat_status
@@ -152,3 +155,4 @@ router.post('/', authenticate, requirePermission('CREATE_SHOW'), enforceTenantSc
 });
 
 export default router;
+
