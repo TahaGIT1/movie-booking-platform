@@ -24,7 +24,9 @@ export const register = async (data) => {
       email: data.email,
       mobileNumber: data.mobileNumber,
       passwordHash,
-      role: data.role
+      // Public registration must never grant privileged roles. Staff accounts
+      // are provisioned by an administrator through the protected admin API.
+      role: 'CUSTOMER'
     }
   });
 

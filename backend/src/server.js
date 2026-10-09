@@ -7,7 +7,7 @@ import { prisma } from './config/prisma.js';
 const httpServer = createServer(app);
 export const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean),
   },
 });
 
