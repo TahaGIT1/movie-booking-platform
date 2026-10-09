@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { SearchModal } from './components/SearchModal';
@@ -15,6 +15,7 @@ import { LoginPage } from './pages/LoginPage';
 import { MovieDetailsPage } from './pages/MovieDetailsPage';
 import { EventDetailsPage } from './pages/EventDetailsPage';
 import { BookingPage } from './pages/BookingPage';
+import { PaymentPage } from './pages/PaymentPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { BookingsHistoryPage } from './pages/BookingsHistoryPage';
 
@@ -46,6 +47,7 @@ function AppLayout() {
           <Route path="/sports/:id" element={<EventDetailsPage />} />
           <Route path="/activities/:id" element={<EventDetailsPage />} />
           <Route path="/book/:movieId" element={<BookingPage />} />
+          <Route path="/payment" element={<PaymentPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/bookings" element={<BookingsHistoryPage />} />
           {/* Catch-all to Home */}
