@@ -1,5 +1,18 @@
-node_modules
-# Keep environment variables out of version control
-.env
+node_modules/
+dist/
 
-/generated/prisma
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Agent-specific skill directories
+/.agents/skills/
+/.claude/skills/
+/.windsurf/skills/
+
+# Neon project-link metadata
+/.neon
