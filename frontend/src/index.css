@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #f8fafc; background: #080b17; font-synthesis: none; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
+.poster-neon { background: radial-gradient(circle at 65% 25%, #fb7185, transparent 22%), linear-gradient(145deg, #4c1d95, #0f172a 62%, #0e7490); }
+.poster-signal { background: radial-gradient(circle at 30% 40%, #f59e0b, transparent 18%), linear-gradient(145deg, #334155, #111827 55%, #7c2d12); }
+.poster-raga { background: radial-gradient(circle at 60% 34%, #f9a8d4, transparent 18%), linear-gradient(145deg, #be185d, #312e81 65%, #172554); }
+.poster-orbit { background: radial-gradient(circle at 50% 35%, #67e8f9, transparent 16%), linear-gradient(145deg, #164e63, #172554 52%, #020617); }
+.poster-moons { background: radial-gradient(circle at 70% 30%, #fef3c7, transparent 14%), linear-gradient(145deg, #0f766e, #164e63 58%, #082f49); }
+.poster-wildfire { background: radial-gradient(circle at 54% 48%, #fb923c, transparent 19%), linear-gradient(145deg, #7f1d1d, #431407 55%, #111827); }
+.poster-garden { background: radial-gradient(circle at 40% 35%, #bef264, transparent 18%), linear-gradient(145deg, #365314, #166534 55%, #172554); }
