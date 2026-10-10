@@ -70,8 +70,29 @@ router.post('/initiate', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']),
       }
     }
 
-    const bookingReference = 'CV' + Math.floor(Math.random() * 100000000);
-    const subtotal = seatIds.length * 200; // Mock 200 cents
+    const show = await prisma.show.findUnique({ where: { id: showId } });
+    if (!show) throw new AppError(404, 'Show not found');
+
+    const seatRecords = await prisma.seat.findMany({
+      where: { id: { in: seatIds } }
+    });
+
+    const pricing = (typeof show.baseTierPricing === 'object' && show.baseTierPricing !== null)
+      ? show.baseTierPricing
+      : { NORMAL: 250, PREMIUM: 380, RECLINER: 550 };
+
+    let calculatedSubtotal = 0;
+    const seatAllocations = seatRecords.map(seat => {
+      // Pricing stored in rupees; cents conversion (or direct unit)
+      const unitPrice = Number(pricing[seat.tier] || pricing.NORMAL || 250);
+      calculatedSubtotal += unitPrice;
+      return {
+        seatId: seat.id,
+        allocatedPriceCents: unitPrice
+      };
+    });
+
+    const bookingReference = 'CV' + Math.floor(10000000 + Math.random() * 90000000);
 
     const booking = await prisma.$transaction(async (tx) => {
       const b = await tx.booking.create({
@@ -79,14 +100,11 @@ router.post('/initiate', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']),
           bookingReference,
           userId,
           showId,
-          subtotalCents: subtotal,
-          totalAmountCents: subtotal,
+          subtotalCents: calculatedSubtotal,
+          totalAmountCents: calculatedSubtotal,
           status: 'INITIATED',
           seats: {
-            create: seatIds.map(seatId => ({
-              seatId,
-              allocatedPriceCents: 200
-            }))
+            create: seatAllocations
           }
         },
         include: { seats: true }

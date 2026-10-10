@@ -199,6 +199,64 @@ router.post('/', authenticate, requirePermission(['CREATE_SHOW', 'MANAGE_SHOWS']
   } catch (err) { next(err); }
 });
 
+// Manager: Batch update pricing for all scheduled shows of a movie
+router.patch('/movie/:movieId/pricing', authenticate, requirePermission(['MANAGE_SHOWS', 'CREATE_SHOW']), enforceTenantScope, async (req, res, next) => {
+  try {
+    const { movieId } = req.params;
+    const { baseTierPricing } = req.body;
+    if (!baseTierPricing) throw new AppError(400, 'baseTierPricing is required');
+
+    const result = await prisma.show.updateMany({
+      where: {
+        theatreId: req.tenantId,
+        movieId,
+        isCancelled: false
+      },
+      data: { baseTierPricing }
+    });
+
+    res.json({
+      success: true,
+      count: result.count,
+      message: `Successfully updated ticket pricing for ${result.count} show session(s)`
+    });
+  } catch (err) { next(err); }
+});
+
+// Manager: Update show details or ticket pricing
+router.patch('/:id', authenticate, requirePermission(['MANAGE_SHOWS', 'CREATE_SHOW']), enforceTenantScope, async (req, res, next) => {
+  try {
+    const show = await prisma.show.findUnique({ where: { id: req.params.id } });
+    if (!show || show.theatreId !== req.tenantId) throw new AppError(404, 'Show not found in your cinema branch');
+
+    const { baseTierPricing, languageVersion, visualFormat, updateAllMovieShows } = req.body;
+
+    // If requested, also cascade the new pricing to all other scheduled shows of this movie in the manager's theatre
+    if (updateAllMovieShows && baseTierPricing) {
+      await prisma.show.updateMany({
+        where: {
+          theatreId: req.tenantId,
+          movieId: show.movieId,
+          isCancelled: false
+        },
+        data: { baseTierPricing }
+      });
+    }
+
+    const updated = await prisma.show.update({
+      where: { id: req.params.id },
+      data: {
+        ...(baseTierPricing !== undefined && { baseTierPricing }),
+        ...(languageVersion && { languageVersion }),
+        ...(visualFormat && { visualFormat })
+      },
+      include: { movie: true, screen: true, _count: { select: { bookings: true } } }
+    });
+
+    res.json({ success: true, data: updated, message: 'Ticket pricing updated successfully' });
+  } catch (err) { next(err); }
+});
+
 // Manager: Cancel a show
 router.patch('/:id/cancel', authenticate, requirePermission(['MANAGE_SHOWS', 'CREATE_SHOW']), enforceTenantScope, async (req, res, next) => {
   try {

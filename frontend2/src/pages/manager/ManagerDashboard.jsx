@@ -14,14 +14,18 @@ import {
   ShieldCheck, 
   CheckCircle2, 
   RefreshCw, 
-  Building2 
+  Building2,
+  Tag,
+  Coins
 } from 'lucide-react';
 import { api } from '../../services/api.service';
+import { EditPricingModal } from '../../components/manager/EditPricingModal';
 
 export const ManagerDashboard = () => {
   const { theatre, refreshTheatre } = useOutletContext();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedShowForPricing, setSelectedShowForPricing] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -188,26 +192,37 @@ export const ManagerDashboard = () => {
               stats.todayShows.map((show) => {
                 const startTime = new Date(show.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const endTime = new Date(show.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const pricing = typeof show.baseTierPricing === 'object' && show.baseTierPricing !== null 
+                  ? show.baseTierPricing 
+                  : { NORMAL: 250, PREMIUM: 380, RECLINER: 550 };
+
                 return (
                   <div
                     key={show.id}
-                    className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-yellow-500/30 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group/item"
                   >
-                    <div className="flex items-center gap-4">
+                    {/* Movie Info & Poster (Click to edit pricing) */}
+                    <div 
+                      onClick={() => setSelectedShowForPricing(show)}
+                      className="flex items-center gap-4 cursor-pointer flex-1"
+                      title="Click to change ticket rates for this screening"
+                    >
                       {show.movie?.posterUrl ? (
                         <img
                           src={show.movie.posterUrl}
                           alt={show.movie.title}
-                          className="w-12 h-16 object-cover rounded-lg shadow-md"
+                          className="w-12 h-16 object-cover rounded-lg shadow-md group-hover/item:scale-105 transition shrink-0"
                         />
                       ) : (
-                        <div className="w-12 h-16 rounded-lg bg-neutral-800 flex items-center justify-center text-neutral-500">
+                        <div className="w-12 h-16 rounded-lg bg-neutral-800 flex items-center justify-center text-neutral-500 shrink-0">
                           <Film size={20} />
                         </div>
                       )}
                       <div>
-                        <div className="text-sm font-bold text-white">{show.movie?.title || 'Unknown Title'}</div>
-                        <div className="text-xs text-neutral-400 mt-0.5 flex items-center gap-2">
+                        <div className="text-sm font-bold text-white group-hover/item:text-yellow-400 transition flex items-center gap-2">
+                          <span>{show.movie?.title || 'Unknown Title'}</span>
+                        </div>
+                        <div className="text-xs text-neutral-400 mt-0.5 flex flex-wrap items-center gap-2">
                           <span className="text-yellow-400 font-medium">{show.screen?.name || `Screen ${show.screen?.screenNumber}`}</span>
                           <span>•</span>
                           <span>{show.languageVersion}</span>
@@ -216,22 +231,41 @@ export const ManagerDashboard = () => {
                             {show.visualFormat}
                           </span>
                         </div>
+                        {/* Quick Pricing Badge */}
+                        <div className="flex items-center gap-2 mt-1.5 text-[11px] font-mono text-neutral-300">
+                          <span className="text-cyan-400 font-bold">N: ₹{pricing.NORMAL || 250}</span>
+                          <span className="text-neutral-600">•</span>
+                          <span className="text-amber-400 font-bold">P: ₹{pricing.PREMIUM || 380}</span>
+                          <span className="text-neutral-600">•</span>
+                          <span className="text-purple-400 font-bold">R: ₹{pricing.RECLINER || 550}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-6 text-right">
+                    <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
                       <div>
                         <div className="text-xs font-mono font-bold text-white">{startTime} - {endTime}</div>
                         <div className="text-[11px] text-neutral-400 mt-0.5">
                           {show._count?.bookings || 0} bookings
                         </div>
                       </div>
+
+                      {/* Change Ticket Pricing Button */}
+                      <button
+                        onClick={() => setSelectedShowForPricing(show)}
+                        className="px-3 py-1.5 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                        title="Change Ticket Pricing"
+                      >
+                        <Coins size={13} />
+                        <span>Edit Price</span>
+                      </button>
+
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${
                         show.isCancelled 
                           ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
                           : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                       }`}>
-                        {show.isCancelled ? 'Cancelled' : 'On Schedule'}
+                        {show.isCancelled ? 'Cancelled' : 'Active'}
                       </span>
                     </div>
                   </div>
@@ -347,6 +381,14 @@ export const ManagerDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit Ticket Pricing Modal */}
+      <EditPricingModal
+        isOpen={!!selectedShowForPricing}
+        show={selectedShowForPricing}
+        onClose={() => setSelectedShowForPricing(null)}
+        onSuccess={fetchDashboardData}
+      />
     </div>
   );
 };

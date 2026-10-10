@@ -213,6 +213,28 @@ export const api = {
     return data.data;
   },
 
+  updateShow: async (showId, updateData) => {
+    const res = await fetch(`${API_BASE_URL}/manager/shows/${showId}`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify(updateData)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to update show');
+    return data.data;
+  },
+
+  updateMovieShowsPricing: async (movieId, baseTierPricing) => {
+    const res = await fetch(`${API_BASE_URL}/manager/shows/movie/${movieId}/pricing`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify({ baseTierPricing })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to update movie pricing');
+    return data;
+  },
+
   cancelShow: async (showId) => {
     const res = await fetch(`${API_BASE_URL}/manager/shows/${showId}/cancel`, {
       method: 'PATCH',

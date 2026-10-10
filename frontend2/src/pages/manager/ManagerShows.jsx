@@ -13,11 +13,18 @@ import {
   Filter, 
   X, 
   Tag, 
-  DollarSign,
-  ChevronRight,
-  RefreshCw
+  DollarSign, 
+  ChevronRight, 
+  RefreshCw,
+  Edit3,
+  Coins,
+  Sparkles,
+  ArrowUpDown,
+  LayoutGrid,
+  ListFilter
 } from 'lucide-react';
 import { api } from '../../services/api.service';
+import { EditPricingModal } from '../../components/manager/EditPricingModal';
 
 export const ManagerShows = () => {
   const { theatre } = useOutletContext();
@@ -26,16 +33,18 @@ export const ManagerShows = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Filters & Views
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedScreenId, setSelectedScreenId] = useState('');
+  const [selectedMovieId, setSelectedMovieId] = useState('');
+  const [viewMode, setViewMode] = useState('timeline'); // 'timeline' | 'by-movie'
 
-  // Modal State
+  // Schedule Modal State
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
 
-  // Form State
+  // New Show Form State
   const [newShow, setNewShow] = useState({
     movieId: '',
     screenId: '',
@@ -51,13 +60,18 @@ export const ManagerShows = () => {
     }
   });
 
+  // Edit Pricing Modal State
+  const [editingShow, setEditingShow] = useState(null);
+  const [editingMovie, setEditingMovie] = useState(null);
+  const [editingMovieShowCount, setEditingMovieShowCount] = useState(1);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
 
   useEffect(() => {
     fetchShows();
-  }, [selectedDate, selectedScreenId]);
+  }, [selectedDate, selectedScreenId, selectedMovieId]);
 
   const fetchInitialData = async () => {
     try {
@@ -86,12 +100,26 @@ export const ManagerShows = () => {
     try {
       const data = await api.getManagerShows({
         date: selectedDate || undefined,
-        screenId: selectedScreenId || undefined
+        screenId: selectedScreenId || undefined,
+        movieId: selectedMovieId || undefined
       });
       setShows(data || []);
     } catch (err) {
       console.error('Failed to fetch manager shows:', err);
     }
+  };
+
+  // Open Edit Pricing for a specific show
+  const openEditPricingModal = (show) => {
+    setEditingMovie(null);
+    setEditingShow(show);
+  };
+
+  // Open Edit Pricing for all shows of a movie
+  const openMoviePricingModal = (movie, count = 1) => {
+    setEditingShow(null);
+    setEditingMovie(movie);
+    setEditingMovieShowCount(count);
   };
 
   // Auto-calculate end time when movie or start time changes
@@ -102,7 +130,7 @@ export const ManagerShows = () => {
     if (startTime) {
       const [hours, minutes] = startTime.split(':').map(Number);
       const totalStartMinutes = hours * 60 + minutes;
-      const totalEndMinutes = totalStartMinutes + duration + 20; // 20 min cleanup/interval
+      const totalEndMinutes = totalStartMinutes + duration + 20; // 20 min interval
       
       const endHours = Math.floor(totalEndMinutes / 60) % 24;
       const endMins = totalEndMinutes % 60;
@@ -127,7 +155,6 @@ export const ManagerShows = () => {
       const startDateTime = new Date(`${newShow.showDate}T${newShow.startTime}:00`);
       let endDateTime = new Date(`${newShow.showDate}T${newShow.endTime}:00`);
 
-      // If end time is past midnight
       if (endDateTime <= startDateTime) {
         endDateTime = new Date(endDateTime.getTime() + 24 * 60 * 60 * 1000);
       }
@@ -175,6 +202,22 @@ export const ManagerShows = () => {
     }
   };
 
+  // Group shows by Movie ID
+  const showsByMovie = React.useMemo(() => {
+    const map = new Map();
+    shows.forEach(show => {
+      const mId = show.movie?.id || show.movieId || 'unknown';
+      if (!map.has(mId)) {
+        map.set(mId, {
+          movie: show.movie,
+          shows: []
+        });
+      }
+      map.get(mId).shows.push(show);
+    });
+    return Array.from(map.values());
+  }, [shows]);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -184,7 +227,7 @@ export const ManagerShows = () => {
             <CalendarDays className="text-yellow-400" /> Show & Slot Scheduler
           </h1>
           <p className="text-sm text-neutral-400 mt-1">
-            Program cinema sessions, set tier pricing, and manage screening timelines.
+            Program cinema sessions, adjust tier pricing, and manage screening timelines. Click any show or movie to edit ticket rates anytime.
           </p>
         </div>
 
@@ -223,11 +266,25 @@ export const ManagerShows = () => {
             ))}
           </select>
 
-          {(selectedDate || selectedScreenId) && (
+          <select
+            value={selectedMovieId}
+            onChange={(e) => setSelectedMovieId(e.target.value)}
+            className="bg-[#181b22] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-yellow-500"
+          >
+            <option value="">All Movies</option>
+            {movies.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.title}
+              </option>
+            ))}
+          </select>
+
+          {(selectedDate || selectedScreenId || selectedMovieId) && (
             <button
               onClick={() => {
                 setSelectedDate('');
                 setSelectedScreenId('');
+                setSelectedMovieId('');
               }}
               className="text-xs text-yellow-400 hover:underline"
             >
@@ -236,8 +293,38 @@ export const ManagerShows = () => {
           )}
         </div>
 
-        <div className="text-xs text-neutral-400">
-          Showing <strong className="text-white">{shows.length}</strong> scheduled sessions
+        {/* View Mode Toggle & Total Sessions */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center bg-[#181b22] border border-white/10 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setViewMode('timeline')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                viewMode === 'timeline' 
+                  ? 'bg-yellow-500 text-black shadow' 
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+              title="Timeline list view"
+            >
+              <CalendarDays size={13} />
+              <span>Timeline</span>
+            </button>
+            <button
+              onClick={() => setViewMode('by-movie')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                viewMode === 'by-movie' 
+                  ? 'bg-yellow-500 text-black shadow' 
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+              title="Group by Movie view"
+            >
+              <Film size={13} />
+              <span>By Movie</span>
+            </button>
+          </div>
+
+          <div className="text-xs text-neutral-400 hidden sm:block">
+            Showing <strong className="text-white">{shows.length}</strong> scheduled sessions
+          </div>
         </div>
       </div>
 
@@ -261,7 +348,126 @@ export const ManagerShows = () => {
             <Plus size={16} /> Schedule First Show
           </button>
         </div>
+      ) : viewMode === 'by-movie' ? (
+        /* BY-MOVIE GROUPED VIEW */
+        <div className="space-y-6">
+          {showsByMovie.map(({ movie: groupMovie, shows: groupShows }) => (
+            <div 
+              key={groupMovie?.id || Math.random()} 
+              className="bg-[#101216] border border-white/5 hover:border-yellow-500/20 rounded-2xl p-6 transition space-y-5"
+            >
+              {/* Movie Header Card */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5">
+                <div 
+                  onClick={() => openMoviePricingModal(groupMovie, groupShows.length)}
+                  className="flex items-center gap-4 cursor-pointer group/movie flex-1"
+                  title="Click movie to edit pricing across all scheduled sessions"
+                >
+                  {groupMovie?.posterUrl ? (
+                    <img 
+                      src={groupMovie.posterUrl} 
+                      alt={groupMovie.title} 
+                      className="w-14 h-20 object-cover rounded-xl shadow-md border border-white/10 group-hover/movie:scale-105 transition shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-20 rounded-xl bg-neutral-800 flex items-center justify-center text-neutral-500 shrink-0">
+                      <Film size={22} />
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-bold text-white group-hover/movie:text-yellow-400 transition flex items-center gap-2">
+                        <span>{groupMovie?.title}</span>
+                        <Edit3 size={14} className="opacity-0 group-hover/movie:opacity-100 text-yellow-400 transition" />
+                      </h3>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                        {groupShows.length} Show Session{groupShows.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="text-xs text-neutral-400 mt-1 flex flex-wrap items-center gap-2">
+                      <span>{groupMovie?.durationMinutes || 120} mins</span>
+                      <span>•</span>
+                      <span>{groupMovie?.originalLanguage || 'English'}</span>
+                      {groupMovie?.genres?.length > 0 && (
+                        <>
+                          <span>•</span>
+                          <span>{groupMovie.genres.join(', ')}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Batch Movie Pricing Button */}
+                <button
+                  onClick={() => openMoviePricingModal(groupMovie, groupShows.length)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs font-bold transition shadow-sm self-start md:self-center"
+                  title="Change ticket pricing for all scheduled shows of this movie"
+                >
+                  <Coins size={15} />
+                  <span>Change Pricing for All Shows ({groupShows.length})</span>
+                </button>
+              </div>
+
+              {/* Scheduled Sessions Grid */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3 flex items-center gap-2">
+                  <Clock size={13} className="text-yellow-400" /> Scheduled Sessions (Click any session to adjust rate)
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {groupShows.map(sessionShow => {
+                    const startDate = new Date(sessionShow.startTime);
+                    const timeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const dateStr = startDate.toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' });
+                    const pricing = typeof sessionShow.baseTierPricing === 'object' && sessionShow.baseTierPricing !== null 
+                      ? sessionShow.baseTierPricing 
+                      : { NORMAL: 250, PREMIUM: 380, RECLINER: 550 };
+
+                    return (
+                      <div
+                        key={sessionShow.id}
+                        onClick={() => openEditPricingModal(sessionShow)}
+                        className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-yellow-500/40 hover:bg-white/[0.04] transition cursor-pointer group/slot relative flex flex-col justify-between gap-2.5"
+                        title="Click to modify ticket rates for this screening"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold text-yellow-400 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
+                              {sessionShow.screen?.name || `Screen ${sessionShow.screen?.screenNumber}`}
+                            </span>
+                            <div className="text-sm font-bold text-white mt-1 group-hover/slot:text-yellow-400 transition flex items-center gap-1.5">
+                              <span>{timeStr}</span>
+                              <span className="text-xs text-neutral-400 font-normal">• {dateStr}</span>
+                            </div>
+                          </div>
+
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-neutral-300 font-bold shrink-0">
+                            {sessionShow.visualFormat}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] font-mono">
+                          <div className="flex items-center gap-2 text-neutral-300">
+                            <span className="text-cyan-400 font-bold">N: ₹{pricing.NORMAL || 250}</span>
+                            <span className="text-neutral-600">•</span>
+                            <span className="text-amber-400 font-bold">P: ₹{pricing.PREMIUM || 380}</span>
+                            <span className="text-neutral-600">•</span>
+                            <span className="text-purple-400 font-bold">R: ₹{pricing.RECLINER || 550}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-yellow-400 group-hover/slot:underline flex items-center gap-1">
+                            <Coins size={11} /> Edit
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        /* TIMELINE VIEW */
         <div className="space-y-4">
           {shows.map((show) => {
             const startDate = new Date(show.startTime);
@@ -269,22 +475,28 @@ export const ManagerShows = () => {
             const formattedDate = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
             const startTimeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const endTimeStr = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const pricing = typeof show.baseTierPricing === 'object' ? show.baseTierPricing : {};
+            const pricing = typeof show.baseTierPricing === 'object' && show.baseTierPricing !== null 
+              ? show.baseTierPricing 
+              : { NORMAL: 250, PREMIUM: 380, RECLINER: 550 };
 
             return (
               <div
                 key={show.id}
-                className={`p-5 rounded-2xl bg-[#101216] border transition flex flex-col lg:flex-row lg:items-center justify-between gap-6 ${
+                className={`p-5 rounded-2xl bg-[#101216] border transition flex flex-col lg:flex-row lg:items-center justify-between gap-6 group/card ${
                   show.isCancelled ? 'border-red-500/20 opacity-70' : 'border-white/5 hover:border-yellow-500/30'
                 }`}
               >
-                {/* Left: Movie & Screen Info */}
-                <div className="flex items-center gap-4">
+                {/* Left: Movie & Screen Info (Clickable to edit pricing) */}
+                <div 
+                  onClick={() => openEditPricingModal(show)}
+                  className="flex items-center gap-4 cursor-pointer group/title flex-1"
+                  title="Click to change ticket pricing and show details"
+                >
                   {show.movie?.posterUrl ? (
                     <img
                       src={show.movie.posterUrl}
                       alt={show.movie.title}
-                      className="w-16 h-24 object-cover rounded-xl shadow-md shrink-0"
+                      className="w-16 h-24 object-cover rounded-xl shadow-md shrink-0 group-hover/title:scale-105 transition"
                     />
                   ) : (
                     <div className="w-16 h-24 rounded-xl bg-neutral-800 flex items-center justify-center text-neutral-500 shrink-0">
@@ -305,8 +517,9 @@ export const ManagerShows = () => {
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-bold text-white">
-                      {show.movie?.title || 'Unknown Film Title'}
+                    <h3 className="text-lg font-bold text-white group-hover/title:text-yellow-400 transition flex items-center gap-2">
+                      <span>{show.movie?.title || 'Unknown Film Title'}</span>
+                      <Edit3 size={14} className="opacity-0 group-hover/title:opacity-100 text-yellow-400 transition" />
                     </h3>
 
                     <div className="text-xs text-neutral-400 flex items-center gap-3">
@@ -321,8 +534,12 @@ export const ManagerShows = () => {
                   </div>
                 </div>
 
-                {/* Middle: Tier Pricing */}
-                <div className="flex items-center gap-3 text-xs bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                {/* Middle: Tier Pricing (Clickable with edit trigger) */}
+                <div 
+                  onClick={() => openEditPricingModal(show)}
+                  className="flex items-center gap-3 text-xs bg-white/[0.02] hover:bg-white/[0.05] p-3 rounded-xl border border-white/5 hover:border-yellow-500/30 transition cursor-pointer group/pricing relative"
+                  title="Click to modify ticket rates for this screening"
+                >
                   <div className="text-center px-2">
                     <div className="text-neutral-500 text-[10px] uppercase font-bold">Normal</div>
                     <div className="font-mono font-bold text-cyan-400 mt-0.5">₹{pricing.NORMAL || 250}</div>
@@ -337,10 +554,14 @@ export const ManagerShows = () => {
                     <div className="text-neutral-500 text-[10px] uppercase font-bold">Recliner</div>
                     <div className="font-mono font-bold text-purple-400 mt-0.5">₹{pricing.RECLINER || 550}</div>
                   </div>
+
+                  <span className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500 text-black opacity-0 group-hover/pricing:opacity-100 transition shadow">
+                    Edit Price
+                  </span>
                 </div>
 
                 {/* Right: Bookings & Status Actions */}
-                <div className="flex items-center justify-between lg:justify-end gap-5">
+                <div className="flex items-center justify-between lg:justify-end gap-4">
                   <div className="text-right">
                     <div className="text-xs font-bold text-white">
                       {show._count?.bookings || 0} Bookings
@@ -353,6 +574,16 @@ export const ManagerShows = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Prominent Edit Pricing Button */}
+                  <button
+                    onClick={() => openEditPricingModal(show)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs font-bold transition shadow-sm"
+                    title="Change Ticket Pricing"
+                  >
+                    <Coins size={13} />
+                    <span>Change Price</span>
+                  </button>
 
                   <div className="flex items-center gap-2">
                     {!show.isCancelled && (
@@ -378,6 +609,19 @@ export const ManagerShows = () => {
           })}
         </div>
       )}
+
+      {/* MODAL: EDIT TICKET PRICING */}
+      <EditPricingModal
+        isOpen={!!editingShow || !!editingMovie}
+        show={editingShow}
+        movie={editingMovie}
+        scheduledShowsCount={editingMovieShowCount}
+        onClose={() => {
+          setEditingShow(null);
+          setEditingMovie(null);
+        }}
+        onSuccess={fetchShows}
+      />
 
       {/* SCHEDULE SHOW MODAL */}
       {isScheduleModalOpen && (
@@ -516,7 +760,8 @@ export const ManagerShows = () => {
                     <input
                       type="number"
                       required
-                      min="50"
+                      min="0"
+                      step="any"
                       value={newShow.pricing.NORMAL}
                       onChange={(e) => setNewShow({
                         ...newShow,
@@ -530,7 +775,8 @@ export const ManagerShows = () => {
                     <input
                       type="number"
                       required
-                      min="50"
+                      min="0"
+                      step="any"
                       value={newShow.pricing.PREMIUM}
                       onChange={(e) => setNewShow({
                         ...newShow,
@@ -544,7 +790,8 @@ export const ManagerShows = () => {
                     <input
                       type="number"
                       required
-                      min="50"
+                      min="0"
+                      step="any"
                       value={newShow.pricing.RECLINER}
                       onChange={(e) => setNewShow({
                         ...newShow,
