@@ -117,6 +117,34 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch }) => {
 
           {/* RIGHT: User Profile, Search, Hamburger */}
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
+            {/* Partner link & Role Console Shortcuts */}
+            {currentUser?.role === 'SUPER_ADMIN' && (
+              <Link
+                to="/admin"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#f5a623]/40 bg-[#f5a623]/10 hover:bg-[#f5a623]/20 text-[#f5a623] text-xs font-semibold transition"
+              >
+                Admin Console
+              </Link>
+            )}
+
+            {currentUser?.role === 'THEATRE_MANAGER' && (
+              <Link
+                to="/manager"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#f5a623]/40 bg-[#f5a623]/10 hover:bg-[#f5a623]/20 text-[#f5a623] text-xs font-semibold transition"
+              >
+                Manager Console
+              </Link>
+            )}
+
+            {!currentUser && (
+              <Link
+                to="/theatre/signup"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white text-xs font-medium transition"
+              >
+                List Cinema
+              </Link>
+            )}
+
             {/* User Profile or Sign In */}
             {currentUser ? (
               <div className="flex items-center gap-2">
@@ -162,6 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch }) => {
                 Sign In
               </Link>
             )}
+
 
             {/* Search Icon */}
             <button

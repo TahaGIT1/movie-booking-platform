@@ -1,12 +1,13 @@
 import { API_BASE_URL } from '../config/constants';
 
 const getHeaders = (hasBody = false) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token') || localStorage.getItem('cinepass_token');
   const headers = {};
   if (hasBody) headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;
 };
+
 
 export const api = {
   // Auth

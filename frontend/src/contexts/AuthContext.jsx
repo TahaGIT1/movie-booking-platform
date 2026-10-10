@@ -11,8 +11,8 @@ export const AuthProvider = ({ children }) => {
   const [authModalMode, setAuthModalMode] = useState('login'); 
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
+    const savedToken = localStorage.getItem('token') || localStorage.getItem('cinepass_token');
+    const savedUser = localStorage.getItem('user') || localStorage.getItem('cinepass_user');
     if (savedToken && savedUser) {
       try {
         setToken(savedToken);
@@ -20,6 +20,8 @@ export const AuthProvider = ({ children }) => {
       } catch (e) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('cinepass_token');
+        localStorage.removeItem('cinepass_user');
       }
     }
   }, []);
@@ -27,6 +29,8 @@ export const AuthProvider = ({ children }) => {
   const login = (newToken, newUser) => {
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
+    localStorage.setItem('cinepass_token', newToken);
+    localStorage.setItem('cinepass_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
     setIsAuthModalOpen(false);
@@ -40,6 +44,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('cinepass_token');
+    localStorage.removeItem('cinepass_user');
     setToken(null);
     setUser(null);
     window.location.href = '/';
