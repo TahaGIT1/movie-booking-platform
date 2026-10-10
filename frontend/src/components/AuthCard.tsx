@@ -51,7 +51,6 @@ export const AuthCard: React.FC = () => {
     }
 
     setIsLoading(true);
-
     try {
       if (mode === 'signin') {
         const res = await api.login(email, password);

@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
   Clock,
   MapPin,
-  Check,
   AlertCircle,
   Loader2,
   ChevronRight,
   Tag,
 } from 'lucide-react';
-import { api, type BookingRecord } from '../services/api';
+import { api } from '../services/api';
 import type { MediaItem } from '../types';
 import { moviesData } from '../data/movies';
+import { eventsData } from '../data/events';
 
 export const BookingPage: React.FC = () => {
   const { movieId } = useParams<{ movieId: string }>();
+  const navigate = useNavigate();
   const [item, setItem] = useState<MediaItem>(() => {
-    return moviesData.find((m) => m.id === movieId) || moviesData[0];
+    return (
+      moviesData.find((m) => m.id === movieId) ||
+      eventsData.find((e) => e.id === movieId) ||
+      moviesData[0]
+    );
   });
 
   const [selectedTheatre, setSelectedTheatre] = useState('IMAX Pavilion Elite KL');
@@ -28,7 +33,6 @@ export const BookingPage: React.FC = () => {
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>(['B4', 'B5', 'C6', 'C7', 'D3', 'D4', 'E4']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [confirmedBooking, setConfirmedBooking] = useState<BookingRecord | null>(null);
 
   // 5-Minute Seat Hold Countdown Timer
   const [holdSecondsLeft, setHoldSecondsLeft] = useState<number>(300);
@@ -79,7 +83,7 @@ export const BookingPage: React.FC = () => {
 
   // Countdown timer effect when seats are selected
   useEffect(() => {
-    if (selectedSeats.length === 0 || confirmedBooking) {
+    if (selectedSeats.length === 0) {
       setHoldSecondsLeft(300);
       return;
     }
@@ -99,7 +103,7 @@ export const BookingPage: React.FC = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [selectedSeats, confirmedBooking]);
+  }, [selectedSeats]);
 
   const dates = [
     { label: 'Today', date: 'Oct 7' },
@@ -194,7 +198,24 @@ export const BookingPage: React.FC = () => {
       });
 
       if (response.success && response.booking) {
-        setConfirmedBooking(response.booking);
+        // Seats are now reserved server-side. Hand off to the payment step;
+        // router state carries the reservation so a refresh on /payment can
+        // fall back to the seat map.
+        navigate('/payment', {
+          state: {
+            booking: {
+              orderId: response.booking.orderId,
+              mediaId: response.booking.mediaId,
+              theatreName: response.booking.theatreName,
+              date: response.booking.date,
+              time: response.booking.time,
+              seats: response.booking.seats,
+              totalAmount: response.booking.totalAmount,
+              title: response.booking.title,
+              posterImage: response.booking.posterImage,
+            },
+          },
+        });
       } else {
         throw new Error(response.error || 'Failed to confirm booking');
       }
@@ -225,13 +246,10 @@ export const BookingPage: React.FC = () => {
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Discovery</span>
         </Link>
-        <span className="text-xs text-neutral-500 font-mono">
-          {confirmedBooking ? 'CONFIRMED' : 'STEP 1 OF 2: SEATS & VENUE'}
-        </span>
+        <span className="text-xs text-neutral-500 font-mono">STEP 1 OF 2: SEATS &amp; VENUE</span>
       </div>
 
-      {!confirmedBooking ? (
-        <div className="bg-[#11131c] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-8">
+      <div className="bg-[#11131c] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-8">
           {/* Header Title */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
             <div>
@@ -485,91 +503,13 @@ export const BookingPage: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <span>Confirm & Issue Tickets</span>
+                  <span>Reserve Seats &amp; Continue to Payment</span>
                   <ChevronRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </div>
         </div>
-      ) : (
-        /* Confirmed Order State */
-        <div className="bg-[#11131c] border border-white/10 rounded-2xl p-8 sm:p-12 shadow-2xl text-center max-w-xl mx-auto space-y-6">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(16,185,129,0.3)]">
-            <Check className="w-8 h-8 stroke-[2.5]" />
-          </div>
-
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-heading font-black text-white">
-              Booking Confirmed!
-            </h2>
-            <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-              Order ID: <span className="text-[#f5a623] font-mono font-bold">{confirmedBooking.orderId}</span>
-            </p>
-          </div>
-
-          <div className="p-5 rounded-xl bg-[#141722] border border-white/10 text-left space-y-3">
-            <div className="border-b border-white/10 pb-3 flex justify-between items-start">
-              <div>
-                <h4 className="font-heading font-bold text-white text-base">
-                  {confirmedBooking.title || item.title}
-                </h4>
-                <p className="text-xs text-neutral-400">{confirmedBooking.theatreName}</p>
-              </div>
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[#f5a623]/20 text-[#f5a623]">
-                {confirmedBooking.status}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <span className="text-neutral-500 block">Date & Time</span>
-                <span className="text-white font-medium">{confirmedBooking.date} @ {confirmedBooking.time}</span>
-              </div>
-              <div>
-                <span className="text-neutral-500 block">Seats</span>
-                <span className="text-[#f5a623] font-mono font-bold text-sm">
-                  {confirmedBooking.seats.join(', ')}
-                </span>
-              </div>
-              <div>
-                <span className="text-neutral-500 block">User Account</span>
-                <span className="text-white font-medium">
-                  {confirmedBooking.customerName || 'Marcus Levin'}
-                </span>
-              </div>
-              <div>
-                <span className="text-neutral-500 block">Amount Paid</span>
-                <span className="text-white font-medium">RM {confirmedBooking.totalAmount.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {confirmedBooking.qrCodeData && (
-              <div className="pt-2 border-t border-white/5 text-[11px] text-neutral-400 flex items-center justify-between">
-                <span>Verification Link:</span>
-                <span className="font-mono text-[#f5a623] truncate max-w-[240px]">
-                  {confirmedBooking.qrCodeData}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-center gap-3">
-            <Link
-              to="/bookings"
-              className="px-6 py-2.5 rounded-xl bg-[#f5a623] text-black font-semibold text-sm hover:bg-[#e09612] transition-colors"
-            >
-              View Booking History
-            </Link>
-            <Link
-              to="/"
-              className="px-6 py-2.5 rounded-xl bg-white/10 text-white font-medium text-sm hover:bg-white/15 border border-white/10 transition-colors"
-            >
-              Back to Home
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+      </div>
+    );
+  };
