@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  MapPin,
+  Check,
+  AlertCircle,
+  Loader2,
+  ChevronRight,
+  Tag,
+} from 'lucide-react';
 import { api, type BookingRecord } from '../services/api';
-import { moviesData } from '../data/movies';
-import { eventsData } from '../data/events';
 import type { MediaItem } from '../types';
-import { ArrowLeft, MapPin, Calendar, Clock, Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
+import { moviesData } from '../data/movies';
 
 export const BookingPage: React.FC = () => {
   const { movieId } = useParams<{ movieId: string }>();
-  
-  // Initial fallback while fetching
-  const initialItem =
-    moviesData.find((m) => m.id === movieId) ||
-    eventsData.find((e) => e.id === movieId) ||
-    moviesData[0];
+  const [item, setItem] = useState<MediaItem>(() => {
+    return moviesData.find((m) => m.id === movieId) || moviesData[0];
+  });
 
-  const [item, setItem] = useState<MediaItem>(initialItem);
   const [selectedTheatre, setSelectedTheatre] = useState('IMAX Pavilion Elite KL');
   const [selectedDate, setSelectedDate] = useState('Tomorrow, Oct 8');
   const [selectedTime, setSelectedTime] = useState('06:30 PM');
@@ -25,14 +30,22 @@ export const BookingPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmedBooking, setConfirmedBooking] = useState<BookingRecord | null>(null);
 
+  // 5-Minute Seat Hold Countdown Timer
+  const [holdSecondsLeft, setHoldSecondsLeft] = useState<number>(300);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
+  const [couponMessage, setCouponMessage] = useState<string | null>(null);
+
   // Fetch item details from API
   useEffect(() => {
     if (!movieId) return;
     let isCancelled = false;
     (async () => {
       const movie = await api.getMovieById(movieId);
-      if (movie) {
-        if (!isCancelled) setItem(movie);
+      if (movie && !isCancelled) {
+        setItem(movie);
         return;
       }
       const event = await api.getEventById(movieId);
@@ -53,7 +66,6 @@ export const BookingPage: React.FC = () => {
         const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime);
         if (isMounted) {
           setOccupiedSeats(seats);
-          // If any currently selected seat became occupied, deselect it
           setSelectedSeats((prev) => prev.filter((s) => !seats.includes(s)));
         }
       } catch (err) {
@@ -64,6 +76,30 @@ export const BookingPage: React.FC = () => {
       isMounted = false;
     };
   }, [selectedTheatre, selectedDate, selectedTime]);
+
+  // Countdown timer effect when seats are selected
+  useEffect(() => {
+    if (selectedSeats.length === 0 || confirmedBooking) {
+      setHoldSecondsLeft(300);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setHoldSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          // Release hold
+          api.releaseSeats('show-demo', selectedSeats);
+          setSelectedSeats([]);
+          setErrorMessage('Your 5-minute seat hold expired. Please re-select your seats.');
+          return 300;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [selectedSeats, confirmedBooking]);
 
   const dates = [
     { label: 'Today', date: 'Oct 7' },
@@ -84,23 +120,66 @@ export const BookingPage: React.FC = () => {
   const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
   const cols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-  const toggleSeat = (seatId: string) => {
+  const getSeatTier = (row: string): { tier: string; price: number; colorClass: string } => {
+    if (row === 'A' || row === 'B') {
+      return { tier: 'Standard', price: 38.0, colorClass: 'border-blue-500/30' };
+    }
+    if (row === 'C' || row === 'D') {
+      return { tier: 'Premium', price: 48.0, colorClass: 'border-purple-500/30' };
+    }
+    return { tier: 'VIP Recliner', price: 65.0, colorClass: 'border-[#f5a623]/30' };
+  };
+
+  const toggleSeat = async (seatId: string) => {
     if (occupiedSeats.includes(seatId)) return;
     setErrorMessage(null);
+
+    let updated: string[];
     if (selectedSeats.includes(seatId)) {
-      setSelectedSeats(selectedSeats.filter((s) => s !== seatId));
+      updated = selectedSeats.filter((s) => s !== seatId);
     } else {
-      setSelectedSeats([...selectedSeats, seatId]);
+      updated = [...selectedSeats, seatId];
+    }
+    setSelectedSeats(updated);
+
+    if (updated.length > 0) {
+      setHoldSecondsLeft(300);
+      await api.lockSeats('show-demo', updated);
+    } else {
+      await api.releaseSeats('show-demo', selectedSeats);
     }
   };
 
-  const ticketPrice = item.priceRM || 38.0;
-  const totalAmount = selectedSeats.length * ticketPrice;
+  // Calculate dynamic total amount based on tiers
+  const subtotal = selectedSeats.reduce((sum, seatId) => {
+    const row = seatId.charAt(0);
+    return sum + getSeatTier(row).price;
+  }, 0);
+
+  const discountAmount = (subtotal * appliedDiscount) / 100;
+  const totalAmount = Math.max(0, subtotal - discountAmount);
+
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = couponCode.trim().toUpperCase();
+    if (code === 'CINEPASS20') {
+      setAppliedDiscount(20);
+      setCouponMessage('✅ 20% discount applied!');
+    } else if (code === 'WELCOME50') {
+      setAppliedDiscount(50);
+      setCouponMessage('🎉 50% Welcome discount applied!');
+    } else {
+      setAppliedDiscount(0);
+      setCouponMessage('❌ Invalid coupon code. Try CINEPASS20');
+    }
+  };
 
   const handleConfirmBooking = async () => {
     if (selectedSeats.length === 0) return;
     setIsSubmitting(true);
     setErrorMessage(null);
+
+    const currentUser = api.getCurrentUser();
 
     try {
       const response = await api.createBooking({
@@ -110,8 +189,8 @@ export const BookingPage: React.FC = () => {
         time: selectedTime,
         seats: selectedSeats,
         totalAmount,
-        customerName: 'Marcus Levin',
-        customerEmail: 'marcus@example.com',
+        customerName: currentUser?.fullName || 'Marcus Levin',
+        customerEmail: currentUser?.email || 'customer@cinepass.com',
       });
 
       if (response.success && response.booking) {
@@ -122,12 +201,17 @@ export const BookingPage: React.FC = () => {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'An error occurred during booking';
       setErrorMessage(msg);
-      // Refresh occupied seats in case of conflict
       const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime);
       setOccupiedSeats(seats);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const formatTimer = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   return (
@@ -167,6 +251,24 @@ export const BookingPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Seat Hold Timer Banner */}
+          {selectedSeats.length > 0 && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs sm:text-sm animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5 text-amber-300">
+                <Clock className="w-4 h-4 animate-pulse text-[#f5a623]" />
+                <span>
+                  <strong>Seats Reserved:</strong> Complete checkout within{' '}
+                  <span className="font-mono font-bold text-white text-base">
+                    {formatTimer(holdSecondsLeft)}
+                  </span>
+                </span>
+              </div>
+              <span className="text-[11px] text-amber-200/70 hidden sm:inline">
+                PostgreSQL Row Lock Active
+              </span>
+            </div>
+          )}
 
           {/* Error notification */}
           {errorMessage && (
@@ -254,72 +356,120 @@ export const BookingPage: React.FC = () => {
             <div className="w-3/4 max-w-md mx-auto mb-8 text-center">
               <div className="h-1.5 w-full bg-gradient-to-r from-transparent via-[#f5a623] to-transparent rounded-full shadow-[0_0_15px_#f5a623]" />
               <span className="text-[11px] uppercase font-mono tracking-widest text-neutral-500 mt-2 block">
-                AUDITORIUM SCREEN
+                AUDITORIUM SCREEN (IMAX LASER)
               </span>
             </div>
 
             <div className="flex flex-col items-center gap-2.5 overflow-x-auto pb-4">
-              {rows.map((row) => (
-                <div key={row} className="flex items-center gap-2">
-                  <span className="w-4 text-xs font-mono text-neutral-500 text-center font-bold">
-                    {row}
-                  </span>
-                  <div className="flex gap-2">
-                    {cols.map((col) => {
-                      const seatId = `${row}${col}`;
-                      const isOccupied = occupiedSeats.includes(seatId);
-                      const isSelected = selectedSeats.includes(seatId);
+              {rows.map((row) => {
+                const tierInfo = getSeatTier(row);
+                return (
+                  <div key={row} className="flex items-center gap-2">
+                    <span className="w-4 text-xs font-mono text-neutral-500 text-center font-bold">
+                      {row}
+                    </span>
+                    <div className="flex gap-2">
+                      {cols.map((col) => {
+                        const seatId = `${row}${col}`;
+                        const isOccupied = occupiedSeats.includes(seatId);
+                        const isSelected = selectedSeats.includes(seatId);
 
-                      return (
-                        <button
-                          key={seatId}
-                          disabled={isOccupied}
-                          onClick={() => toggleSeat(seatId)}
-                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-all ${
-                            isOccupied
-                              ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed border border-white/5'
-                              : isSelected
-                              ? 'bg-[#f5a623] text-black shadow-[0_0_10px_#f5a623] cursor-pointer'
-                              : 'bg-white/10 hover:bg-white/20 text-neutral-300 border border-white/10 cursor-pointer'
-                          }`}
-                        >
-                          {col}
-                        </button>
-                      );
-                    })}
+                        return (
+                          <button
+                            key={seatId}
+                            disabled={isOccupied}
+                            onClick={() => toggleSeat(seatId)}
+                            title={`${row}${col} - ${tierInfo.tier} (RM ${tierInfo.price})`}
+                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-all ${
+                              isOccupied
+                                ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed border border-white/5'
+                                : isSelected
+                                ? 'bg-[#f5a623] text-black shadow-[0_0_10px_#f5a623] cursor-pointer ring-2 ring-[#f5a623]/50'
+                                : `bg-white/10 hover:bg-white/20 text-neutral-300 border ${tierInfo.colorClass} cursor-pointer`
+                            }`}
+                          >
+                            {col}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* Seat legend */}
-            <div className="flex items-center justify-center gap-6 mt-4 text-xs text-neutral-400">
+            {/* Seat legend with tiers */}
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 mt-6 text-xs text-neutral-400">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-white/10 border border-white/15" />
-                <span>Available</span>
+                <div className="w-3.5 h-3.5 rounded bg-white/10 border border-blue-500/40" />
+                <span>Standard (RM 38)</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-[#f5a623]" />
+                <div className="w-3.5 h-3.5 rounded bg-white/10 border border-purple-500/40" />
+                <span>Premium (RM 48)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-3.5 rounded bg-white/10 border border-[#f5a623]/50" />
+                <span>VIP Recliner (RM 65)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-3.5 rounded bg-[#f5a623]" />
                 <span className="text-white font-medium">Selected</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-neutral-800 border border-white/5" />
-                <span>Reserved</span>
+                <div className="w-3.5 h-3.5 rounded bg-neutral-800 border border-white/5" />
+                <span>Booked</span>
               </div>
             </div>
           </div>
+
+          {/* Coupon Code Section */}
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-neutral-300">
+              <Tag className="w-4 h-4 text-[#f5a623]" />
+              <span>Promo Code (e.g. <strong>CINEPASS20</strong>, <strong>WELCOME50</strong>):</span>
+            </div>
+            <form onSubmit={handleApplyCoupon} className="flex gap-2 w-full sm:w-auto">
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                placeholder="Enter coupon"
+                className="bg-black/40 border border-white/15 focus:border-[#f5a623] rounded-lg px-3 py-1.5 text-xs text-white uppercase outline-none"
+              />
+              <button
+                type="submit"
+                className="px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/15 transition-colors cursor-pointer"
+              >
+                Apply
+              </button>
+            </form>
+          </div>
+          {couponMessage && (
+            <div className="text-xs px-2 text-neutral-300 font-medium">{couponMessage}</div>
+          )}
 
           {/* Checkout Bar */}
           <div className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <div className="text-xs text-neutral-400">
-                Selected Seats: <span className="text-white font-semibold">{selectedSeats.join(', ') || 'None'}</span>
-              </div>
-              <div className="text-xl font-heading font-black text-[#f5a623] mt-0.5">
-                RM {totalAmount.toFixed(2)}
-                <span className="text-xs text-neutral-400 font-normal ml-2">
-                  (RM {ticketPrice.toFixed(2)} / ticket)
+                Selected Seats:{' '}
+                <span className="text-white font-semibold">
+                  {selectedSeats.join(', ') || 'None selected'}
                 </span>
+                {appliedDiscount > 0 && (
+                  <span className="ml-2 text-emerald-400 font-bold">
+                    ({appliedDiscount}% OFF Applied)
+                  </span>
+                )}
+              </div>
+              <div className="text-xl font-heading font-black text-[#f5a623] mt-0.5 flex items-baseline gap-2">
+                <span>RM {totalAmount.toFixed(2)}</span>
+                {appliedDiscount > 0 && (
+                  <span className="text-xs text-neutral-400 line-through">
+                    RM {subtotal.toFixed(2)}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -343,7 +493,7 @@ export const BookingPage: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Confirmed Order State connected to real backend response */
+        /* Confirmed Order State */
         <div className="bg-[#11131c] border border-white/10 rounded-2xl p-8 sm:p-12 shadow-2xl text-center max-w-xl mx-auto space-y-6">
           <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(16,185,129,0.3)]">
             <Check className="w-8 h-8 stroke-[2.5]" />

@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
-import { Search, Menu, X, MapPin, ChevronDown, User, Tag, Film } from 'lucide-react';
+import { Search, Menu, X, MapPin, ChevronDown, User, Tag, Film, LogOut } from 'lucide-react';
+import { api, type UserProfile } from '../services/api';
 
 interface NavbarProps {
   onOpenSearch?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch }) => {
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => api.getCurrentUser());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('Malaysia, Global');
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const location = useLocation();
+
+  const handleLogout = () => {
+    api.logout();
+    setCurrentUser(null);
+  };
 
   const navLinks = [
     { label: 'All Movies', path: '/' },
@@ -110,26 +117,51 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch }) => {
 
           {/* RIGHT: User Profile, Search, Hamburger */}
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
-            {/* User Profile */}
-            <Link
-              to="/profile"
-              className="flex items-center gap-2.5 p-1 rounded-full hover:bg-white/5 transition-colors group cursor-pointer"
-            >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 ring-1 ring-white/10 group-hover:border-[#f5a623] transition-colors bg-neutral-800 flex items-center justify-center">
-                <img
-                  src="/images/avatars/marcus.jpg"
-                  alt="Marcus Levin"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-                <User className="w-4 h-4 text-neutral-400 group-hover:text-white" />
+            {/* User Profile or Sign In */}
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2.5 p-1 rounded-full hover:bg-white/5 transition-colors group cursor-pointer"
+                >
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 ring-1 ring-white/10 group-hover:border-[#f5a623] transition-colors bg-neutral-800 flex items-center justify-center">
+                    <img
+                      src="/images/avatars/marcus.jpg"
+                      alt={currentUser.fullName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    <User className="w-4 h-4 text-neutral-400 group-hover:text-white" />
+                  </div>
+                  <div className="hidden sm:flex flex-col text-left">
+                    <span className="text-xs font-semibold text-neutral-200 group-hover:text-white transition-colors truncate max-w-[120px]">
+                      {currentUser.fullName}
+                    </span>
+                    {currentUser.role !== 'CUSTOMER' && (
+                      <span className="text-[9px] text-[#f5a623] font-medium leading-none">
+                        {currentUser.role.replace('_', ' ')}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-              <span className="hidden sm:inline-block text-xs font-medium text-neutral-200 group-hover:text-white transition-colors">
-                Marcus Levin
-              </span>
-            </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="text-xs font-semibold text-black bg-[#f5a623] hover:bg-[#e09612] px-3.5 py-1.5 rounded-full transition-all shadow-md shadow-[#f5a623]/20 cursor-pointer"
+              >
+                Sign In
+              </Link>
+            )}
 
             {/* Search Icon */}
             <button
@@ -250,13 +282,26 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSearch }) => {
                   >
                     My Bookings
                   </Link>
-                  <Link
-                    to="/login"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3.5 py-2 text-sm text-[#f5a623] hover:underline rounded-lg font-semibold"
-                  >
-                    Login / Sign In
-                  </Link>
+                  {currentUser ? (
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-white/5 rounded-lg font-medium flex items-center justify-between cursor-pointer"
+                    >
+                      <span>Sign Out ({currentUser.fullName.split(' ')[0]})</span>
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <Link
+                      to="/login"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-3.5 py-2 text-sm text-[#f5a623] hover:underline rounded-lg font-semibold"
+                    >
+                      Login / Sign In
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
