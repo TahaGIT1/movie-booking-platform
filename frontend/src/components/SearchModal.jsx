@@ -1,127 +1,175 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Film, Calendar, Tv, Sparkles, Trophy, Zap, ArrowRight } from 'lucide-react';
+import { Search, X, Film, MapPin, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { moviesData } from '../data/movies';
-import { eventsData } from '../data/events';
-import { streamsData } from '../data/streams';
-import { playsData } from '../data/plays';
-import { sportsData } from '../data/sports';
-import { activitiesData } from '../data/activities';
+import { api } from '../services/api';
+
 export const SearchModal = ({ isOpen, onClose }) => {
-    const [query, setQuery] = useState('');
-    const inputRef = useRef(null);
-    useEffect(() => {
-        if (isOpen) {
-            setTimeout(() => inputRef.current?.focus(), 100);
-            document.body.style.overflow = 'hidden';
-        }
-        else {
-            document.body.style.overflow = 'unset';
-        }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [isOpen]);
-    if (!isOpen)
-        return null;
-    const allItems = [
-        ...moviesData.map((m) => ({ item: m, type: 'movie' })),
-        ...eventsData.map((e) => ({ item: e, type: 'event' })),
-        ...streamsData.map((s) => ({ item: s, type: 'stream' })),
-        ...playsData.map((p) => ({ item: p, type: 'play' })),
-        ...sportsData.map((sp) => ({ item: sp, type: 'sport' })),
-        ...activitiesData.map((a) => ({ item: a, type: 'activity' })),
-    ];
-    const results = query.trim()
-        ? allItems.filter(({ item }) => item.title.toLowerCase().includes(query.toLowerCase()) ||
-            item.genre.toLowerCase().includes(query.toLowerCase()) ||
-            item.description.toLowerCase().includes(query.toLowerCase()))
-        : allItems.slice(0, 8);
-    const getTargetUrl = (type, id) => {
-        switch (type) {
-            case 'movie':
-                return `/movie/${id}`;
-            case 'event':
-                return `/events/${id}`;
-            case 'stream':
-                return `/streams/${id}`;
-            case 'play':
-                return `/plays/${id}`;
-            case 'sport':
-                return `/sports/${id}`;
-            case 'activity':
-                return `/activities/${id}`;
-            default:
-                return `/movie/${id}`;
-        }
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState({ movies: [], theatres: [] });
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
     };
-    const getCategoryIcon = (type) => {
-        switch (type) {
-            case 'movie':
-                return <Film className="w-3.5 h-3.5 text-[#f5a623]"/>;
-            case 'event':
-                return <Calendar className="w-3.5 h-3.5 text-[#f5a623]"/>;
-            case 'stream':
-                return <Tv className="w-3.5 h-3.5 text-blue-400"/>;
-            case 'play':
-                return <Sparkles className="w-3.5 h-3.5 text-purple-400"/>;
-            case 'sport':
-                return <Trophy className="w-3.5 h-3.5 text-emerald-400"/>;
-            case 'activity':
-                return <Zap className="w-3.5 h-3.5 text-amber-400"/>;
-            default:
-                return <Film className="w-3.5 h-3.5 text-[#f5a623]"/>;
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    setLoading(true);
+    const delay = setTimeout(() => {
+      api.search(query).then((data) => {
+        if (isMounted) {
+          setResults({
+            movies: data.movies || [],
+            theatres: data.theatres || [],
+          });
+          setLoading(false);
         }
+      }).catch(() => {
+        if (isMounted) {
+          setResults({ movies: [], theatres: [] });
+          setLoading(false);
+        }
+      });
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(delay);
     };
-    return (<div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-20 px-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-[#11131a] border border-white/15 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+  }, [query, isOpen]);
+
+  if (!isOpen) return null;
+
+  const hasResults = results.movies.length > 0 || results.theatres.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-3xl rounded-2xl bg-[#11131c] border border-white/15 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
         {/* Search Input Bar */}
-        <div className="flex items-center px-4 py-3.5 border-b border-white/10 gap-3">
-          <Search className="w-5 h-5 text-[#f5a623]"/>
-          <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search movies, concerts, broadway plays, F1, VR arenas..." className="w-full bg-transparent text-white placeholder-neutral-500 text-sm sm:text-base outline-none"/>
-          {query && (<button onClick={() => setQuery('')} className="text-neutral-400 hover:text-white p-1">
-              <X className="w-4 h-4"/>
-            </button>)}
-          <button onClick={onClose} className="text-neutral-400 hover:text-white text-xs px-2 py-1 rounded bg-white/5 border border-white/10 ml-2">
+        <div className="p-4 sm:p-5 border-b border-white/10 flex items-center gap-3">
+          <Search className="w-5 h-5 text-[#f5a623] shrink-0" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search movies, theatres, or events in database..."
+            className="w-full bg-transparent text-white placeholder-neutral-500 text-base sm:text-lg focus:outline-none font-medium"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="p-1 rounded-full hover:bg-white/10 text-neutral-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-neutral-300 font-semibold ml-1 cursor-pointer"
+          >
             ESC
           </button>
         </div>
 
         {/* Results List */}
-        <div className="overflow-y-auto p-4 space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 px-2 pb-1">
-            {query.trim() ? `Search Results (${results.length})` : 'Popular Recommendations'}
-          </div>
+        <div className="overflow-y-auto p-4 sm:p-6 space-y-6">
+          {loading && (
+            <div className="text-center py-8 text-neutral-400 text-sm">
+              Searching database...
+            </div>
+          )}
 
-          {results.length === 0 ? (<div className="text-center py-12 text-neutral-400">
-              <p className="text-sm">No results found for "{query}"</p>
+          {!loading && !hasResults && (
+            <div className="text-center py-12">
+              <Film className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-white">No results found in database</p>
               <p className="text-xs text-neutral-500 mt-1">
-                Try searching for Batman, Dune, Hamilton, F1, Music Fest, or VR
+                {query ? `No items matched "${query}"` : 'Type a query to search'}
               </p>
-            </div>) : (results.map(({ item, type }) => (<Link key={`${type}-${item.id}`} to={getTargetUrl(type, item.id)} onClick={onClose} className="flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all group">
-                <div className="w-12 h-16 rounded-lg overflow-hidden bg-neutral-800 shrink-0 border border-white/10">
-                  <img src={item.posterImage} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform"/>
-                </div>
+            </div>
+          )}
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-neutral-400 uppercase font-mono flex items-center gap-1">
-                      {getCategoryIcon(type)}
-                      {type}
-                    </span>
-                    <span className="text-[11px] text-[#f5a623] font-medium">★ {item.rating}</span>
-                  </div>
-                  <h4 className="text-sm font-semibold text-white group-hover:text-[#f5a623] transition-colors truncate">
-                    {item.title}
-                  </h4>
-                  <p className="text-xs text-neutral-400 truncate">
-                    {item.genre} • {item.formats.join(', ')}
-                  </p>
-                </div>
+          {/* Movies Results */}
+          {results.movies.length > 0 && (
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block mb-3">
+                Movies & Shows ({results.movies.length})
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {results.movies.map((movie) => (
+                  <Link
+                    key={movie.id}
+                    to={`/movie/${movie.id}`}
+                    onClick={onClose}
+                    className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition flex items-center gap-3 group"
+                  >
+                    <img
+                      src={movie.posterUrl || '/images/movies/the-batman.jpg'}
+                      alt={movie.title}
+                      className="w-10 h-14 object-cover rounded-lg shrink-0"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-white truncate group-hover:text-[#f5a623] transition-colors">
+                        {movie.title}
+                      </h4>
+                      <p className="text-xs text-neutral-400 truncate">
+                        {movie.synopsis || (movie.genres && movie.genres.join(', ')) || 'Now in Theatres'}
+                      </p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-white group-hover:translate-x-0.5 transition shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
-                <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-white group-hover:translate-x-1 transition-all"/>
-              </Link>)))}
+          {/* Theatres Results */}
+          {results.theatres.length > 0 && (
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block mb-3">
+                Cinema Venues ({results.theatres.length})
+              </span>
+              <div className="space-y-2">
+                {results.theatres.map((theatre) => (
+                  <Link
+                    key={theatre.id}
+                    to="/theatres"
+                    onClick={onClose}
+                    className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <MapPin className="w-4 h-4 text-[#f5a623]" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-white group-hover:text-[#f5a623] transition-colors">
+                          {theatre.name}
+                        </h4>
+                        <p className="text-xs text-neutral-400">
+                          {theatre.addressLine || theatre.city || 'Cinema venue'}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-neutral-500 group-hover:text-white group-hover:translate-x-0.5 transition shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>);
+    </div>
+  );
 };

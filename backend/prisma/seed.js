@@ -312,8 +312,18 @@ async function seed() {
   // 7. Coupons
   console.log('🏷️ Seeding coupons...');
   const coupons = [
-    { code: 'CINEPASS20', discountPercentage: 20.0 },
-    { code: 'WELCOME50', discountPercentage: 50.0 },
+    {
+      code: 'CINEPASS20',
+      discountPercentage: 20.0,
+      validFrom: new Date(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    },
+    {
+      code: 'WELCOME50',
+      discountPercentage: 50.0,
+      validFrom: new Date(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    },
   ];
 
   for (const c of coupons) {

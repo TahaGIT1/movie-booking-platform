@@ -80,7 +80,7 @@ export const PaymentPage = () => {
     // Returning directly to /payment without a booking is a dead end.
     useEffect(() => {
         if (!booking) {
-            const timer = setTimeout(() => navigate('/book/the-batman', { replace: true }), 2200);
+            const timer = setTimeout(() => navigate('/', { replace: true }), 2200);
             return () => clearTimeout(timer);
         }
     }, [booking, navigate]);

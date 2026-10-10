@@ -47,7 +47,7 @@ router.get('/search', async (req, res, next) => {
         take: 10
       }),
       prisma.theatre.findMany({
-        where: { name: { contains: q, mode: 'insensitive' }, status: 'ACTIVE' },
+        where: { name: { contains: q, mode: 'insensitive' }, status: { in: ['ACTIVE', 'APPROVED'] } },
         take: 10
       })
     ]);
