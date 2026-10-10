@@ -144,17 +144,43 @@ router.get('/my/analytics', authenticate, requirePermission(['VIEW_REPORTS', 'MA
 // Public customer routes
 router.get('/', async (req, res, next) => {
   try {
-    const theatres = await prisma.theatre.findMany({ where: { status: 'ACTIVE' } });
+    const { city } = req.query;
+    const where = { status: 'ACTIVE' };
+    if (city && city !== 'All Cities') {
+      where.city = { contains: city, mode: 'insensitive' };
+    }
+    const theatres = await prisma.theatre.findMany({
+      where,
+      include: {
+        screens: {
+          include: {
+            shows: {
+              where: { startTime: { gte: new Date() } },
+              include: { movie: true }
+            }
+          }
+        }
+      }
+    });
     res.json({ success: true, data: theatres });
   } catch (err) { next(err); }
 });
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const theatre = await prisma.theatre.findUnique({
-      where: { id: req.params.id },
-      include: { screens: true }
-    });
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id);
+    let theatre = null;
+    if (isUuid) {
+      theatre = await prisma.theatre.findUnique({
+        where: { id: req.params.id },
+        include: { screens: true }
+      });
+    } else {
+      theatre = await prisma.theatre.findFirst({
+        where: { name: { contains: req.params.id.replace(/-/g, ' '), mode: 'insensitive' } },
+        include: { screens: true }
+      });
+    }
     if (!theatre) throw new AppError(404, 'Theatre not found');
     res.json({ success: true, data: theatre });
   } catch (err) { next(err); }

@@ -38,3 +38,23 @@ export const authenticate = async (req, res, next) => {
     }
   }
 };
+
+export const optionalAuthenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, env.JWT_SECRET);
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { id: true, role: true, theatreId: true, isBlocked: true, fullName: true, email: true }
+      });
+      if (user && !user.isBlocked) {
+        req.user = user;
+      }
+    }
+  } catch {
+    // Continue unauthenticated
+  }
+  next();
+};
