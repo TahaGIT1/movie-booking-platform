@@ -57,6 +57,51 @@ export const api = {
     return data.data || data;
   },
 
+  getAdminMovies: async () => {
+    const res = await fetch(`${API_BASE_URL}/admin/movies`, { headers: getHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch movies');
+    return data.data || [];
+  },
+
+  createMovie: async (movieData) => {
+    const res = await fetch(`${API_BASE_URL}/admin/movies`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(movieData),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const errMsg = data.error?.message || data.message || 'Failed to create movie';
+      throw new Error(errMsg);
+    }
+    return data.data || data;
+  },
+
+  updateMovie: async (movieId, movieData) => {
+    const res = await fetch(`${API_BASE_URL}/admin/movies/${movieId}`, {
+      method: 'PUT',
+      headers: getHeaders(true),
+      body: JSON.stringify(movieData),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const errMsg = data.error?.message || data.message || 'Failed to update movie';
+      throw new Error(errMsg);
+    }
+    return data.data || data;
+  },
+
+  deleteMovie: async (movieId) => {
+    const res = await fetch(`${API_BASE_URL}/admin/movies/${movieId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to delete movie');
+    return data;
+  },
+
   // Super Admin
   getAdminTheatres: async (status) => {
     const url = status 
