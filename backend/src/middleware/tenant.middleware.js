@@ -18,7 +18,7 @@ export const enforceTenantScope = (req, res, next) => {
   req.tenantId = req.user.theatreId;
 
   // If a theatreId is provided in params/body, validate it
-  const resourceTheatreId = req.params.theatreId || req.body.theatreId;
+  const resourceTheatreId = req.params?.theatreId || req.body?.theatreId;
   
   if (resourceTheatreId && resourceTheatreId !== req.user.theatreId) {
     return next(new AppError(403, 'Cross-tenant access forbidden', 'CROSS_TENANT_VIOLATION'));

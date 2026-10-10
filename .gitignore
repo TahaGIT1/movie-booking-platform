@@ -5,3 +5,5 @@ dist/
 .playwright-mcp/
 *.log
 integration_*.png
+frontend2/dist/
+frontend2/build/

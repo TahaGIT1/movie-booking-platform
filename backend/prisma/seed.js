@@ -10,18 +10,30 @@ async function seed() {
     { role: 'CUSTOMER', permission: 'BOOK_TICKETS' },
     { role: 'CUSTOMER', permission: 'VIEW_OWN_BOOKINGS' },
     { role: 'CUSTOMER', permission: 'CANCEL_OWN_BOOKING' },
+    { role: 'CUSTOMER', permission: 'VIEW_BOOKINGS' },
+    { role: 'CUSTOMER', permission: 'LEAVE_REVIEWS' },
     { role: 'THEATRE_MANAGER', permission: 'MANAGE_THEATRE' },
     { role: 'THEATRE_MANAGER', permission: 'MANAGE_SCREEN' },
+    { role: 'THEATRE_MANAGER', permission: 'MANAGE_SCREENS' },
     { role: 'THEATRE_MANAGER', permission: 'MANAGE_SEATS' },
     { role: 'THEATRE_MANAGER', permission: 'CREATE_SHOW' },
+    { role: 'THEATRE_MANAGER', permission: 'MANAGE_SHOWS' },
     { role: 'THEATRE_MANAGER', permission: 'VIEW_THEATRE_ANALYTICS' },
+    { role: 'THEATRE_MANAGER', permission: 'VIEW_REPORTS' },
+    { role: 'THEATRE_MANAGER', permission: 'MANAGE_STAFF' },
     { role: 'THEATRE_MANAGER', permission: 'BOOK_TICKETS' },
+    { role: 'THEATRE_MANAGER', permission: 'MANAGE_BOOKINGS' },
     { role: 'THEATRE_STAFF', permission: 'SCAN_TICKET' },
+    { role: 'THEATRE_STAFF', permission: 'SCAN_TICKETS' },
     { role: 'THEATRE_STAFF', permission: 'VIEW_TODAY_SHOWS' },
+    { role: 'THEATRE_STAFF', permission: 'VIEW_TODAYS_SHOWS' },
     { role: 'THEATRE_STAFF', permission: 'VIEW_MOVIES' },
     { role: 'SUPER_ADMIN', permission: 'CREATE_MOVIE' },
+    { role: 'SUPER_ADMIN', permission: 'MANAGE_MOVIES' },
     { role: 'SUPER_ADMIN', permission: 'MANAGE_USERS' },
     { role: 'SUPER_ADMIN', permission: 'APPROVE_THEATRE' },
+    { role: 'SUPER_ADMIN', permission: 'APPROVE_THEATRES' },
+    { role: 'SUPER_ADMIN', permission: 'VIEW_AUDIT_LOGS' },
     { role: 'SUPER_ADMIN', permission: 'GLOBAL_OVERRIDE' },
   ];
 
@@ -58,26 +70,6 @@ async function seed() {
     {
       name: 'GSC Mid Valley Megamall',
       legalEntityName: 'Golden Screen Cinemas Sdn Bhd',
-      addressLine: 'Level 4, Mid Valley Megamall, Lingkaran Syed Putra',
-      city: 'Kuala Lumpur',
-      state: 'Wilayah Persekutuan',
-      postalCode: '59200',
-      status: 'ACTIVE',
-      amenities: ['4DX Motion', 'Dolby Atmos', 'ScreenX 270', 'Popcorn Bar'],
-    },
-    {
-      name: 'TGV Sunway Pyramid',
-      legalEntityName: 'TGV Cinemas Sdn Bhd',
-      addressLine: 'Level 1, Sunway Pyramid, No. 3, Jalan PJS 11/15',
-      city: 'Petaling Jaya',
-      state: 'Selangor',
-      postalCode: '47500',
-      status: 'ACTIVE',
-      amenities: ['IMAX', 'INDULGE Lounge', 'Kids Hall', 'Dolby Surround 7.1'],
-    },
-    {
-      name: 'Aurum Theatre The Gardens',
-      legalEntityName: 'Aurum Experiences Sdn Bhd',
       addressLine: 'The Gardens Mall, Mid Valley City',
       city: 'Kuala Lumpur',
       state: 'Wilayah Persekutuan',
@@ -100,14 +92,15 @@ async function seed() {
 
   // 3. Default Users
   console.log('👤 Seeding default users...');
-  const passwordHash = await bcrypt.hash('Password123!', 10);
+  const defaultPasswordHash = await bcrypt.hash('Password123!', 10);
+  const adminPasswordHash = await bcrypt.hash('Admin@123', 10);
   const usersData = [
     {
       fullName: 'Marcus Levin',
       email: 'customer@cinepass.com',
       mobileNumber: '+60123456789',
       role: 'CUSTOMER',
-      passwordHash,
+      passwordHash: defaultPasswordHash,
     },
     {
       fullName: 'Sarah Jenkins',
@@ -115,7 +108,7 @@ async function seed() {
       mobileNumber: '+60123456790',
       role: 'THEATRE_MANAGER',
       theatreId: createdTheatres[0].id,
-      passwordHash,
+      passwordHash: defaultPasswordHash,
     },
     {
       fullName: 'Alex Tan',
@@ -123,14 +116,21 @@ async function seed() {
       mobileNumber: '+60123456791',
       role: 'THEATRE_STAFF',
       theatreId: createdTheatres[0].id,
-      passwordHash,
+      passwordHash: defaultPasswordHash,
     },
     {
       fullName: 'Super Admin',
       email: 'admin@cinepass.com',
       mobileNumber: '+60123456792',
       role: 'SUPER_ADMIN',
-      passwordHash,
+      passwordHash: defaultPasswordHash,
+    },
+    {
+      fullName: 'Super Admin',
+      email: 'admin@cineverse.com',
+      mobileNumber: '1234567890',
+      role: 'SUPER_ADMIN',
+      passwordHash: adminPasswordHash,
     },
   ];
 
@@ -329,6 +329,7 @@ async function seed() {
   console.log('  Manager:  manager@cinepass.com / Password123!');
   console.log('  Staff:    staff@cinepass.com / Password123!');
   console.log('  Admin:    admin@cinepass.com / Password123!');
+  console.log('  Admin2:   admin@cineverse.com / Admin@123');
 }
 
 seed()

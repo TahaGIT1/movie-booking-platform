@@ -8,6 +8,8 @@ import screenRoutes from '../modules/screens/screens.routes.js';
 import showRoutes from '../modules/shows/shows.routes.js';
 import bookingRoutes from '../modules/bookings/bookings.routes.js';
 import staffRoutes from '../modules/staff/staff.routes.js';
+import seatRoutes from '../modules/seats/seats.routes.js';
+import adminAnalyticsRoutes from '../modules/admin/admin.analytics.routes.js';
 
 const router = Router();
 
@@ -15,11 +17,19 @@ router.use('/auth', authRoutes);
 router.use('/admin/movies', adminMovieRoutes);
 router.use('/admin/theatres', adminTheatreRoutes);
 router.use('/movies', movieRoutes);
+
+// Manager portal scoped routes
 router.use('/manager/theatre', theatreRoutes);
+router.use('/theatres', theatreRoutes);
+router.use('/manager/analytics', adminAnalyticsRoutes);
 router.use('/manager/screens', screenRoutes);
+router.use('/screens', screenRoutes);
+router.use('/manager/seats', seatRoutes);
 router.use('/manager/shows', showRoutes);
 router.use('/shows', showRoutes);
+router.use('/manager/bookings', bookingRoutes);
 router.use('/bookings', bookingRoutes);
+router.use('/manager/staff', staffRoutes);
 router.use('/staff', staffRoutes);
 
 router.get('/health', (req, res) => {
