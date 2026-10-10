@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export const AuthCard: React.FC = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -40,7 +41,7 @@ export const AuthCard: React.FC = () => {
       setIsLoading(false);
       setSuccessMessage('Welcome back, Marcus! Redirecting to movies...');
       setTimeout(() => {
-        window.location.href = '/';
+        navigate('/', { replace: true });
       }, 1200);
     }, 1000);
   };
@@ -51,7 +52,7 @@ export const AuthCard: React.FC = () => {
       setIsLoading(false);
       setSuccessMessage('Connected via Google account. Redirecting...');
       setTimeout(() => {
-        window.location.href = '/';
+        navigate('/', { replace: true });
       }, 1000);
     }, 800);
   };
