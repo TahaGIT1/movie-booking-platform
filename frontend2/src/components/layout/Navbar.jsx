@@ -26,8 +26,25 @@ export const Navbar = () => {
 
       {/* Right Side */}
       <div className="flex items-center gap-6">
+        {!token && (
+          <Link 
+            to="/theatre/signup" 
+            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-yellow-500/30 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 hover:text-yellow-300 text-xs font-bold transition"
+          >
+            List Your Cinema
+          </Link>
+        )}
+
         {user?.role === 'SUPER_ADMIN' && (
-          <Link to="/admin" className="text-yellow-500 hover:text-yellow-400 transition font-medium text-sm">Admin Dashboard</Link>
+          <Link to="/admin" className="text-yellow-500 hover:text-yellow-400 transition font-medium text-sm flex items-center gap-1.5">
+            Admin Console
+          </Link>
+        )}
+
+        {user?.role === 'THEATRE_MANAGER' && (
+          <Link to="/manager" className="text-yellow-500 hover:text-yellow-400 transition font-medium text-sm flex items-center gap-1.5">
+            Manager Console
+          </Link>
         )}
         
         {token && user ? (

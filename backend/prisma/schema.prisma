@@ -82,6 +82,7 @@ model Theatre {
   longitude       Decimal?      @db.Decimal(11, 8)
   amenities       Json          @default("[]")
   status          TheatreStatus @default(PENDING)
+  rejectionReason String?       @map("rejection_reason")
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

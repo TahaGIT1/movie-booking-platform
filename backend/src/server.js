@@ -1,27 +1,11 @@
 import { createServer } from 'http';
-import { Server } from 'socket.io';
 import app from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
+import { initSocket } from './socket.js';
 
 const httpServer = createServer(app);
-export const io = new Server(httpServer, {
-  cors: {
-    origin: '*',
-  },
-});
-
-io.on('connection', (socket) => {
-  console.log('Socket connected:', socket.id);
-
-  socket.on('join_show', (showId) => {
-    socket.join(`show:${showId}`);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Socket disconnected:', socket.id);
-  });
-});
+export const io = initSocket(httpServer);
 
 const startServer = async () => {
   try {

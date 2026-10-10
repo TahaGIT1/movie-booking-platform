@@ -7,12 +7,12 @@ import { AppError } from '../../middleware/error.middleware.js';
 
 const router = Router();
 
-router.use(authenticate, requirePermission('MANAGE_SCREEN'), enforceTenantScope);
+router.use(authenticate, requirePermission(['MANAGE_SCREEN', 'MANAGE_SCREENS', 'MANAGE_SEATS']), enforceTenantScope);
 
 router.put('/:id', async (req, res, next) => {
   try {
     const seatId = req.params.id;
-    const { tier, isAccessible, status } = req.body;
+    const { tier, isAccessible, isBroken } = req.body;
 
     const seat = await prisma.seat.findUnique({
       where: { id: seatId },
@@ -24,7 +24,11 @@ router.put('/:id', async (req, res, next) => {
 
     const updatedSeat = await prisma.seat.update({
       where: { id: seatId },
-      data: { tier, isAccessible, status }
+      data: {
+        ...(tier && { tier }),
+        ...(isAccessible !== undefined && { isAccessible }),
+        ...(isBroken !== undefined && { isBroken })
+      }
     });
 
     res.json({ success: true, data: updatedSeat });
@@ -33,7 +37,11 @@ router.put('/:id', async (req, res, next) => {
 
 router.post('/bulk-update', async (req, res, next) => {
   try {
-    const { seatIds, tier, isAccessible, status } = req.body;
+    const { seatIds, tier, isAccessible, isBroken } = req.body;
+
+    if (!seatIds || !Array.isArray(seatIds) || seatIds.length === 0) {
+      throw new AppError(400, 'seatIds array is required');
+    }
 
     // Verify all seats belong to this theatre
     const seats = await prisma.seat.findMany({
@@ -44,12 +52,17 @@ router.post('/bulk-update', async (req, res, next) => {
     const invalidSeats = seats.filter(s => s.screen.theatreId !== req.tenantId);
     if (invalidSeats.length > 0) throw new AppError(403, 'Some seats do not belong to your theatre');
 
+    const data = {};
+    if (tier) data.tier = tier;
+    if (isAccessible !== undefined) data.isAccessible = isAccessible;
+    if (isBroken !== undefined) data.isBroken = isBroken;
+
     await prisma.seat.updateMany({
       where: { id: { in: seatIds } },
-      data: { tier, isAccessible, status }
+      data
     });
 
-    res.json({ success: true, message: 'Seats updated successfully' });
+    res.json({ success: true, message: `${seatIds.length} seats updated successfully` });
   } catch (err) { next(err); }
 });
 

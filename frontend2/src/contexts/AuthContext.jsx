@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
@@ -15,8 +14,13 @@ export const AuthProvider = ({ children }) => {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     }
   }, []);
 
@@ -28,6 +32,8 @@ export const AuthProvider = ({ children }) => {
     setIsAuthModalOpen(false);
     if (newUser.role === 'SUPER_ADMIN') {
       window.location.href = '/admin';
+    } else if (newUser.role === 'THEATRE_MANAGER') {
+      window.location.href = '/manager';
     }
   };
 
@@ -49,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthModalOpen, authModalMode, setAuthModalMode, openAuthModal, closeAuthModal }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthModalOpen, authModalMode, setAuthModalMode, openAuthModal, closeAuthModal, setUser }}>
       {children}
     </AuthContext.Provider>
   );

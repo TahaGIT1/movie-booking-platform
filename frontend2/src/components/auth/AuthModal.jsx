@@ -1,10 +1,12 @@
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Building2, ArrowRight } from 'lucide-react';
 import { api } from '../../services/api.service';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const AuthModal = () => {
+  const navigate = useNavigate();
   const { isAuthModalOpen, closeAuthModal, authModalMode, setAuthModalMode, login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,18 +26,8 @@ export const AuthModal = () => {
         const result = await api.login({ email, password });
         login(result.data.accessToken, result.data.user);
       } else {
-        // Assume signup endpoint exists and logs in user directly or requires manual login
-        const res = await fetch(import.meta.env.VITE_API_BASE_URL + '/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, fullName })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          login(data.data.accessToken, data.data.user);
-        } else {
-          throw new Error(data.error?.message || data.message || 'Signup failed');
-        }
+        const result = await api.register({ email, password, fullName, role: 'CUSTOMER' });
+        login(result.data.accessToken, result.data.user);
       }
     } catch (err) {
       setError(err.message || 'Authentication failed');
@@ -46,7 +38,7 @@ export const AuthModal = () => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-[#0a0b0e]/80 border border-white/10 p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-300">
+      <div className="bg-[#0a0b0e]/90 border border-white/10 p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-300">
         <button onClick={closeAuthModal} className="absolute top-4 right-4 text-neutral-400 hover:text-white transition">
           <X size={24} />
         </button>
@@ -99,7 +91,7 @@ export const AuthModal = () => {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-yellow-500 text-black font-bold py-4 rounded-xl hover:bg-yellow-400 transition hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] mt-2"
+            className="w-full bg-yellow-500 text-black font-bold py-4 rounded-xl hover:bg-yellow-400 transition hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] mt-2 cursor-pointer"
           >
             {loading ? 'Processing...' : (authModalMode === 'login' ? 'Sign In' : 'Sign Up')}
           </button>
@@ -107,11 +99,39 @@ export const AuthModal = () => {
 
         <div className="mt-6 text-center text-sm text-neutral-400">
           {authModalMode === 'login' ? (
-            <p>Don't have an account? <button onClick={() => setAuthModalMode('signup')} className="text-yellow-500 font-bold hover:underline">Sign up</button></p>
+            <p>Don't have an account? <button onClick={() => setAuthModalMode('signup')} className="text-yellow-500 font-bold hover:underline cursor-pointer">Sign up</button></p>
           ) : (
-            <p>Already have an account? <button onClick={() => setAuthModalMode('login')} className="text-yellow-500 font-bold hover:underline">Log in</button></p>
+            <p>Already have an account? <button onClick={() => setAuthModalMode('login')} className="text-yellow-500 font-bold hover:underline cursor-pointer">Log in</button></p>
           )}
         </div>
+
+        {/* PROMINENT THEATER MANAGER SIGNUP LINK */}
+        {authModalMode === 'signup' && (
+          <div className="mt-5 pt-5 border-t border-white/10 text-center">
+            <div className="bg-yellow-500/10 border border-yellow-500/25 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-left">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-yellow-500/20 text-yellow-400 flex items-center justify-center shrink-0">
+                  <Building2 size={16} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">Theatre Manager?</p>
+                  <p className="text-[11px] text-neutral-400">List and manage your cinema</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  closeAuthModal();
+                  navigate('/theatre/signup');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold whitespace-nowrap transition flex items-center gap-1 cursor-pointer"
+              >
+                <span>Sign up as Manager</span>
+                <ArrowRight size={12} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

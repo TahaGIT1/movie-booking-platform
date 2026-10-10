@@ -1,1 +1,4 @@
-./frontend
+frontend/
+frontend2/dist/
+frontend2/build/
+*.log

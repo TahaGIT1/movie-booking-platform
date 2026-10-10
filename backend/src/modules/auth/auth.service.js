@@ -18,13 +18,38 @@ export const register = async (data) => {
 
   const passwordHash = await bcrypt.hash(data.password, 12);
 
+  let theatreId = null;
+  const theatreName = data.theatreName || data.theatre?.name;
+  if (data.role === 'THEATRE_MANAGER' && theatreName) {
+    const theatre = await prisma.theatre.create({
+      data: {
+        name: theatreName,
+        legalEntityName: data.legalEntityName || data.theatre?.legalEntityName || null,
+        gstNumber: data.gstNumber || data.theatre?.gstNumber || null,
+        contactPhone: data.theatrePhone || data.theatre?.contactPhone || data.mobileNumber || null,
+        contactEmail: data.theatreEmail || data.theatre?.contactEmail || data.email,
+        addressLine: data.addressLine || data.theatre?.addressLine || 'Main Road',
+        city: data.city || data.theatre?.city || 'City',
+        state: data.state || data.theatre?.state || 'State',
+        postalCode: data.postalCode || data.theatre?.postalCode || null,
+        amenities: data.amenities || data.theatre?.amenities || [],
+        status: 'PENDING'
+      }
+    });
+    theatreId = theatre.id;
+  }
+
   const user = await prisma.user.create({
     data: {
       fullName: data.fullName,
       email: data.email,
       mobileNumber: data.mobileNumber,
       passwordHash,
-      role: data.role
+      role: data.role,
+      theatreId
+    },
+    include: {
+      theatre: true
     }
   });
 

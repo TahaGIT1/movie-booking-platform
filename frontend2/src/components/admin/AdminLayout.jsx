@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Film, Building2, CalendarDays, LayoutDashboard, LogOut } from 'lucide-react';
+import { Film, Building2, CalendarDays, LayoutDashboard, LogOut, ClipboardCheck } from 'lucide-react';
 
 export const AdminLayout = () => {
   const location = useLocation();
@@ -15,8 +15,9 @@ export const AdminLayout = () => {
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    { name: 'Movies', path: '/admin/movies', icon: Film },
+    { name: 'Theatre Requests', path: '/admin/theatre-requests', icon: ClipboardCheck },
     { name: 'Theatres', path: '/admin/theatres', icon: Building2 },
+    { name: 'Movies', path: '/admin/movies', icon: Film },
     { name: 'Shows', path: '/admin/shows', icon: CalendarDays },
   ];
 

@@ -1,16 +1,48 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { requirePermission } from '../../middleware/permission.middleware.js';
+import { enforceTenantScope } from '../../middleware/tenant.middleware.js';
 import { prisma } from '../../config/prisma.js';
-import { io } from '../../server.js';
+import { io } from '../../socket.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import crypto from 'crypto';
 
 const router = Router();
 
-router.use(authenticate, requirePermission('BOOK_TICKETS'));
+router.use(authenticate);
 
-router.post('/initiate', async (req, res, next) => {
+// Manager: Get all bookings for their theatre's shows
+router.get('/theatre', requirePermission(['VIEW_BOOKINGS', 'MANAGE_BOOKINGS', 'MANAGE_THEATRE']), enforceTenantScope, async (req, res, next) => {
+  try {
+    const { status, showId, search } = req.query;
+    const where = {
+      show: { theatreId: req.tenantId }
+    };
+    if (status) where.status = status;
+    if (showId) where.showId = showId;
+    if (search) {
+      where.OR = [
+        { bookingReference: { contains: search, mode: 'insensitive' } },
+        { user: { fullName: { contains: search, mode: 'insensitive' } } },
+        { user: { email: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: {
+        user: { select: { id: true, fullName: true, email: true, mobileNumber: true } },
+        show: { include: { movie: true, screen: true } },
+        seats: { include: { seat: true } },
+        payments: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    res.json({ success: true, data: bookings });
+  } catch (err) { next(err); }
+});
+
+router.post('/initiate', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']), async (req, res, next) => {
   try {
     const { showId, seatIds } = req.body;
     const userId = req.user.id;
@@ -66,7 +98,7 @@ router.post('/initiate', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/mock-payment', async (req, res, next) => {
+router.post('/:id/mock-payment', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']), async (req, res, next) => {
   try {
     const bookingId = req.params.id;
     const { status } = req.body; // 'SUCCESS' or 'FAILED'
@@ -90,7 +122,7 @@ router.post('/:id/mock-payment', async (req, res, next) => {
           const rows = await tx.$queryRaw`
             SELECT id, status, locked_by_user_id, lock_expires_at 
             FROM show_seat_status 
-            WHERE show_id = \${booking.showId}::uuid AND seat_id = \${seatId}::uuid 
+            WHERE show_id = ${booking.showId}::uuid AND seat_id = ${seatId}::uuid 
             FOR UPDATE
           `;
           
@@ -114,7 +146,7 @@ router.post('/:id/mock-payment', async (req, res, next) => {
           await tx.$queryRaw`
             UPDATE show_seat_status
             SET status = 'BOOKED', locked_by_user_id = NULL, lock_expires_at = NULL
-            WHERE id = \${seatStatus.id}::uuid
+            WHERE id = ${seatStatus.id}::uuid
           `;
         }
 
@@ -136,7 +168,7 @@ router.post('/:id/mock-payment', async (req, res, next) => {
 
       // Broadcast updates
       for (const bs of booking.seats) {
-        io.to(`show:\${booking.showId}`).emit('seat:booked', { seatId: bs.seatId, userId });
+        io.to(`show:${booking.showId}`).emit('seat:booked', { seatId: bs.seatId, userId });
       }
 
       res.json({ success: true, message: 'Payment successful, tickets booked' });
@@ -151,7 +183,7 @@ router.post('/:id/mock-payment', async (req, res, next) => {
           const rows = await tx.$queryRaw`
             SELECT id, locked_by_user_id, lock_expires_at 
             FROM show_seat_status 
-            WHERE show_id = \${booking.showId}::uuid AND seat_id = \${seatId}::uuid 
+            WHERE show_id = ${booking.showId}::uuid AND seat_id = ${seatId}::uuid 
             FOR UPDATE
           `;
           
@@ -161,7 +193,7 @@ router.post('/:id/mock-payment', async (req, res, next) => {
                await tx.$queryRaw`
                  UPDATE show_seat_status
                  SET locked_by_user_id = NULL, lock_expires_at = NULL
-                 WHERE id = \${seatStatus.id}::uuid
+                 WHERE id = ${seatStatus.id}::uuid
                `;
              }
           }
@@ -169,7 +201,7 @@ router.post('/:id/mock-payment', async (req, res, next) => {
       });
       
       for (const bs of booking.seats) {
-        io.to(`show:\${booking.showId}`).emit('seat:released', { seatId: bs.seatId });
+        io.to(`show:${booking.showId}`).emit('seat:released', { seatId: bs.seatId });
       }
 
       res.json({ success: false, message: 'Payment failed' });
@@ -179,12 +211,18 @@ router.post('/:id/mock-payment', async (req, res, next) => {
 
 router.get('/my', async (req, res, next) => {
   try {
-    const bookings = await prisma.booking.findMany({ where: { userId: req.user.id } });
+    const bookings = await prisma.booking.findMany({
+      where: { userId: req.user.id },
+      include: {
+        show: { include: { movie: true, screen: true, theatre: true } },
+        seats: { include: { seat: true } },
+        payments: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
     res.json({ success: true, data: bookings });
   } catch (err) { next(err); }
 });
-
-
 
 router.post('/:id/cancel', async (req, res, next) => {
   try {
