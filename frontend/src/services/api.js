@@ -89,11 +89,17 @@ export const api = {
     };
   },
 
-  async login(email, password) {
+  async login(emailOrCreds, password) {
+    let payload;
+    if (typeof emailOrCreds === 'object' && emailOrCreds !== null) {
+      payload = emailOrCreds;
+    } else {
+      payload = { email: emailOrCreds, password };
+    }
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
     if (!res.ok || !body.success) {
@@ -110,11 +116,17 @@ export const api = {
     return { success: true, data: body.data };
   },
 
-  async register(fullName, email, password, mobileNumber) {
+  async register(nameOrPayload, email, password, mobileNumber) {
+    let payload;
+    if (typeof nameOrPayload === 'object' && nameOrPayload !== null) {
+      payload = { role: 'CUSTOMER', ...nameOrPayload };
+    } else {
+      payload = { fullName: nameOrPayload, email, password, mobileNumber: mobileNumber || undefined, role: 'CUSTOMER' };
+    }
     const res = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, email, password, mobileNumber: mobileNumber || undefined, role: 'CUSTOMER' }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
     if (!res.ok || !body.success) {

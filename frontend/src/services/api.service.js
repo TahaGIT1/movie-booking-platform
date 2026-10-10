@@ -11,28 +11,54 @@ const getHeaders = (hasBody = false) => {
 
 export const api = {
   // Auth
-  login: async (credentials) => {
+  login: async (credentialsOrEmail, password) => {
+    const body = typeof credentialsOrEmail === 'object' && credentialsOrEmail !== null
+      ? credentialsOrEmail
+      : { email: credentialsOrEmail, password };
     const res = await fetch(API_BASE_URL + '/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.message || 'Login failed');
     }
-    return await res.json();
+    const json = await res.json();
+    if (json.data?.accessToken) {
+      localStorage.setItem('token', json.data.accessToken);
+      localStorage.setItem('cinepass_token', json.data.accessToken);
+    }
+    if (json.data?.user) {
+      localStorage.setItem('user', JSON.stringify(json.data.user));
+      localStorage.setItem('cinepass_user', JSON.stringify(json.data.user));
+    }
+    return json;
   },
 
-  register: async (userData) => {
+  register: async (userDataOrName, email, password, mobileNumber) => {
+    let body;
+    if (typeof userDataOrName === 'object' && userDataOrName !== null) {
+      body = { role: 'CUSTOMER', ...userDataOrName };
+    } else {
+      body = { fullName: userDataOrName, email, password, mobileNumber: mobileNumber || undefined, role: 'CUSTOMER' };
+    }
     const res = await fetch(API_BASE_URL + '/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
       throw new Error(data.error?.message || data.message || 'Registration failed');
+    }
+    if (data.data?.accessToken) {
+      localStorage.setItem('token', data.data.accessToken);
+      localStorage.setItem('cinepass_token', data.data.accessToken);
+    }
+    if (data.data?.user) {
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+      localStorage.setItem('cinepass_user', JSON.stringify(data.data.user));
     }
     return data;
   },
