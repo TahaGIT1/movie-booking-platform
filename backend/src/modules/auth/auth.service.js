@@ -18,16 +18,41 @@ export const register = async (data) => {
 
   const passwordHash = await bcrypt.hash(data.password, 12);
 
-  const user = await prisma.user.create({
-    data: {
-      fullName: data.fullName,
-      email: data.email,
-      mobileNumber: data.mobileNumber,
-      passwordHash,
-      // Public registration must never grant privileged roles. Staff accounts
-      // are provisioned by an administrator through the protected admin API.
-      role: 'CUSTOMER'
+  const role = data.role || 'CUSTOMER';
+  if (role === 'THEATRE_MANAGER' && !data.theatreName) {
+    throw new AppError(400, 'Theatre details are required for manager registration', 'THEATRE_DETAILS_REQUIRED');
+  }
+  const user = await prisma.$transaction(async (tx) => {
+    let theatreId = null;
+    if (role === 'THEATRE_MANAGER') {
+      const theatre = await tx.theatre.create({
+        data: {
+          name: data.theatreName,
+          legalEntityName: data.legalEntityName || null,
+          gstNumber: data.gstNumber || null,
+          contactPhone: data.theatrePhone || data.mobileNumber || null,
+          contactEmail: data.theatreEmail || data.email,
+          addressLine: data.addressLine,
+          city: data.city,
+          state: data.state,
+          postalCode: data.postalCode || null,
+          amenities: data.amenities || [],
+          status: 'PENDING'
+        }
+      });
+      theatreId = theatre.id;
     }
+    return tx.user.create({
+      data: {
+        fullName: data.fullName,
+        email: data.email,
+        mobileNumber: data.mobileNumber,
+        passwordHash,
+        role,
+        theatreId
+      },
+      include: { theatre: true }
+    });
   });
 
   const tokens = generateTokens(user.id);
