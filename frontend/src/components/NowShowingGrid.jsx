@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { Star, Ticket, Clock, Info, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
-export const NowShowingGrid = ({ items, onBook, onWatchTrailer, title = 'Now Showing in Cinemas', subtitle = 'Discover what’s lighting up screens across major cinemas this week.', }) => {
+export const NowShowingGrid = ({
+    items,
+    onBook,
+    onWatchTrailer,
+    title = 'Now Showing in Cinemas',
+    subtitle = 'Discover what’s lighting up screens across major cinemas this week.',
+    activeTab = 'now',
+    onTabChange,
+}) => {
     const [selectedFormat, setSelectedFormat] = useState('All');
     const formats = ['All', 'IMAX', '3D', 'Dolby Atmos', '4DX'];
     const filteredItems = items.filter((item) => {
@@ -11,12 +19,48 @@ export const NowShowingGrid = ({ items, onBook, onWatchTrailer, title = 'Now Sho
         return itemFormats.some((f) => f.toLowerCase().includes(selectedFormat.toLowerCase()));
     });
     return (<section className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-10 py-10 sm:py-14">
-      {/* Header and format filter tabs */}
+      {/* Header, category tabs and format filter tabs */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
-          <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#f5a623]/15 text-[#f5a623] border border-[#f5a623]/30 mb-2 inline-block">
-            BOX OFFICE DISCOVERY
-          </span>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#f5a623]/15 text-[#f5a623] border border-[#f5a623]/30 inline-block">
+              TMDB LIVE CATALOG
+            </span>
+            {onTabChange && (
+              <div className="inline-flex rounded-full bg-white/5 border border-white/10 p-0.5 text-xs font-semibold">
+                <button
+                  onClick={() => onTabChange('now')}
+                  className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+                    activeTab === 'now'
+                      ? 'bg-[#f5a623] text-black shadow-sm'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Now Showing
+                </button>
+                <button
+                  onClick={() => onTabChange('upcoming')}
+                  className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+                    activeTab === 'upcoming'
+                      ? 'bg-[#f5a623] text-black shadow-sm'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Coming Soon
+                </button>
+                <button
+                  onClick={() => onTabChange('trending')}
+                  className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+                    activeTab === 'trending'
+                      ? 'bg-[#f5a623] text-black shadow-sm'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Trending
+                </button>
+              </div>
+            )}
+          </div>
           <h2 className="text-2xl sm:text-3xl font-heading font-black text-white tracking-tight">
             {title}
           </h2>
@@ -34,6 +78,7 @@ export const NowShowingGrid = ({ items, onBook, onWatchTrailer, title = 'Now Sho
             </button>))}
         </div>
       </div>
+
 
       {/* Grid of Posters */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">

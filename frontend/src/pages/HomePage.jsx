@@ -11,56 +11,95 @@ import { OffersSection } from '../components/OffersSection';
 export const HomePage = () => {
   const [bookingItem, setBookingItem] = useState(null);
   const [trailerItem, setTrailerItem] = useState(null);
-  const [movies, setMovies] = useState([]);
+  const [nowPlaying, setNowPlaying] = useState([]);
+  const [upcoming, setUpcoming] = useState([]);
+  const [trending, setTrending] = useState([]);
+  const [activeTab, setActiveTab] = useState('now');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    api.getMovies().then((data) => {
+    Promise.all([
+      api.getNowPlaying().catch(() => []),
+      api.getUpcoming().catch(() => []),
+      api.getTrending().catch(() => []),
+    ]).then(([np, up, tr]) => {
       if (isMounted) {
-        setMovies(Array.isArray(data) ? data : []);
+        setNowPlaying(Array.isArray(np) ? np : []);
+        setUpcoming(Array.isArray(up) ? up : []);
+        setTrending(Array.isArray(tr) ? tr : []);
         setLoading(false);
       }
     }).catch(() => {
       if (isMounted) {
-        setMovies([]);
         setLoading(false);
       }
     });
+
     return () => {
       isMounted = false;
     };
   }, []);
 
+  const heroMovies = activeTab === 'upcoming'
+    ? (upcoming.length > 0 ? upcoming : nowPlaying)
+    : (nowPlaying.length > 0 ? nowPlaying : upcoming);
+
   const heroConfig = {
     pageType: 'movies',
-    statusLabelLeft: 'Tomorrow',
-    statusSubLeft: 'Session schedule',
+    statusLabelLeft: activeTab === 'upcoming' ? 'Coming Soon' : 'Now Showing',
+    statusSubLeft: activeTab === 'upcoming' ? 'Advance reservations' : 'Session schedule',
     genres: ['Action', 'Drama', 'Sci-Fi'],
     statusToggle: {
       activeOption: 'Now Showing',
       secondaryOption: 'Coming Soon',
     },
-    items: movies.slice(0, 4),
+    items: heroMovies.slice(0, 4),
   };
+
+  const gridItems = activeTab === 'upcoming'
+    ? upcoming
+    : activeTab === 'trending'
+      ? trending
+      : nowPlaying;
+
+  const gridTitle = activeTab === 'upcoming'
+    ? 'Upcoming Releases & Advance Booking'
+    : activeTab === 'trending'
+      ? 'Trending Movies Worldwide'
+      : 'Now Showing in Cinemas';
+
+  const gridSubtitle = activeTab === 'upcoming'
+    ? 'Be the first to discover and reserve seats for the most anticipated global blockbusters.'
+    : activeTab === 'trending'
+      ? 'The most watched, talked-about, and highly-rated releases across the globe.'
+      : 'Reserve tickets for the biggest blockbusters showing in IMAX, 3D, and Dolby Atmos.';
 
   return (
     <main className="w-full">
-      {/* 1. PRIMARY FIGMA REFERENCE HERO SECTION (rendered only if movies exist in DB) */}
-      {movies.length > 0 && (
-        <HeroSection config={heroConfig} onOpenBooking={setBookingItem} />
+      {/* 1. PRIMARY FIGMA REFERENCE HERO SECTION (rendered only if movies exist in DB/TMDB) */}
+      {heroMovies.length > 0 && (
+        <HeroSection
+          config={heroConfig}
+          onOpenBooking={setBookingItem}
+          currentStatusCategory={activeTab === 'upcoming' ? 'upcoming' : 'now'}
+          onStatusCategoryChange={(status) => setActiveTab(status)}
+        />
       )}
 
-      {/* 2. NOW SHOWING CATALOG GRID */}
-      {movies.length > 0 ? (
+      {/* 2. NOW SHOWING / COMING SOON / TRENDING CATALOG GRID */}
+      {gridItems.length > 0 ? (
         <NowShowingGrid
-          items={movies}
+          items={gridItems}
           onBook={setBookingItem}
           onWatchTrailer={setTrailerItem}
-          title="Now Showing in Cinemas"
-          subtitle="Reserve tickets for the biggest blockbusters showing in IMAX, 3D, and Dolby Atmos."
+          title={gridTitle}
+          subtitle={gridSubtitle}
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab)}
         />
       ) : !loading ? (
+
         <div className="w-full max-w-[1720px] mx-auto px-6 py-16 text-center">
           <div className="inline-flex p-4 rounded-full bg-white/5 border border-white/10 mb-4 text-3xl">🎬</div>
           <h2 className="text-xl font-bold text-white mb-2">No Movies Found in Database</h2>

@@ -1,14 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Rating } from './Rating';
 import { Badge } from './Badge';
 import { PrimaryButton } from './PrimaryButton';
 import { SecondaryButton } from './SecondaryButton';
 import { CategoryFilter } from './CategoryFilter';
 import { Carousel } from './Carousel';
-export const HeroSection = ({ config, onOpenBooking }) => {
+export const HeroSection = ({ config, onOpenBooking, onStatusCategoryChange, currentStatusCategory = 'now' }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [selectedGenre, setSelectedGenre] = useState(config.genres[0] || 'All');
-    const [statusCategory, setStatusCategory] = useState('now');
+    const [statusCategory, setStatusCategory] = useState(currentStatusCategory);
+
+    // Keep internal status synchronized with external prop if provided
+    useEffect(() => {
+        if (currentStatusCategory && currentStatusCategory !== statusCategory) {
+            setStatusCategory(currentStatusCategory);
+        }
+    }, [currentStatusCategory]);
+
     const currentItem = config.items[selectedIndex] || config.items[0];
     if (!currentItem) {
         return null;
@@ -123,17 +131,18 @@ export const HeroSection = ({ config, onOpenBooking }) => {
           <CategoryFilter label={config.pageType === 'events' ? undefined : 'Genre'} categories={config.genres} selectedCategory={selectedGenre} onSelectCategory={setSelectedGenre}/>
 
           <div className="flex items-center gap-2 text-xs sm:text-sm font-medium self-end sm:self-auto select-none">
-            <button onClick={() => setStatusCategory('now')} className={`transition-colors cursor-pointer ${statusCategory === 'now'
+            <button onClick={() => { setStatusCategory('now'); onStatusCategoryChange?.('now'); }} className={`transition-colors cursor-pointer ${statusCategory === 'now'
             ? 'text-white font-semibold'
             : 'text-neutral-500 hover:text-neutral-300'}`}>
               {config.statusToggle.activeOption}
             </button>
             <span className="text-neutral-600 font-light">/</span>
-            <button onClick={() => setStatusCategory('upcoming')} className={`transition-colors cursor-pointer ${statusCategory === 'upcoming'
+            <button onClick={() => { setStatusCategory('upcoming'); onStatusCategoryChange?.('upcoming'); }} className={`transition-colors cursor-pointer ${statusCategory === 'upcoming'
             ? 'text-white font-semibold'
             : 'text-neutral-500 hover:text-neutral-300'}`}>
               {config.statusToggle.secondaryOption}
             </button>
+
           </div>
         </div>
       </div>

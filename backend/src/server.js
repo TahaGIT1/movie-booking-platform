@@ -1,7 +1,12 @@
+import dns from 'dns';
 import { createServer } from 'http';
 import app from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
+
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
 import { initSocket, io } from './socket.js';
 
 export { io };

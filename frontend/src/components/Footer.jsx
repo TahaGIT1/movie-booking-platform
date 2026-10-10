@@ -190,6 +190,27 @@ export const Footer = () => {
           </div>
         </div>
 
+        {/* TMDB API Attribution (Required by TMDB API Terms) */}
+        <div className="py-6 border-b border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-400">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
+              <span className="font-extrabold tracking-tight text-[#01b4e4] text-xs">TMDB</span>
+              <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-semibold">API PARTNER</span>
+            </div>
+            <p className="text-[11px] text-neutral-400">
+              This product uses the TMDB API but is not endorsed or certified by TMDB. Movie metadata, posters, and trailers powered by The Movie Database.
+            </p>
+          </div>
+          <a
+            href="https://www.themoviedb.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] text-neutral-500 hover:text-[#01b4e4] transition-colors shrink-0"
+          >
+            themoviedb.org →
+          </a>
+        </div>
+
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
           <div className="flex flex-wrap items-center gap-4 text-neutral-500">
@@ -201,6 +222,7 @@ export const Footer = () => {
             <span>•</span>
             <span className="hover:text-neutral-300 cursor-pointer">Terms of Service</span>
           </div>
+
 
           <div className="flex items-center gap-4">
             <span className="text-neutral-400 flex items-center gap-1.5 text-xs">

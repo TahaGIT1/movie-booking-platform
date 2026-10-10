@@ -39,8 +39,9 @@ router.get('/occupied-seats', async (req, res, next) => {
           showId: targetShowId,
           OR: [
             { status: 'BOOKED' },
+            { status: 'UNAVAILABLE' },
             {
-              status: 'LOCKED',
+              lockedByUserId: { not: null },
               lockExpiresAt: { gt: new Date() }
             }
           ]
@@ -154,8 +155,9 @@ router.post('/', optionalAuthenticate, async (req, res, next) => {
             subtotalCents: amountCents,
             totalAmountCents: amountCents,
             status: 'CONFIRMED',
-            qrScanStatus: 'PENDING'
+            qrScanStatus: 'UNUSED'
           }
+
         });
 
         // Record payment

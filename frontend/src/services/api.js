@@ -577,32 +577,40 @@ export function normalizeMediaItem(raw, index = 0) {
     heroBadge: index === 0 ? 'FEATURED' : undefined,
     badgeTopRight: raw.badgeTopRight || undefined,
     rating: typeof raw.rating === 'number' ? raw.rating : 4.5,
-    genre: rawGenres.join(', ') || 'Feature',
-    genreTags: rawGenres,
+    genre: raw.genre || (rawGenres.join(', ') || 'Feature'),
+    genreTags: raw.genreTags || rawGenres,
     formats: uniqueFormats,
-    description: raw.synopsis || raw.description || '',
+    description: raw.description || raw.synopsis || '',
     posterImage: poster,
     backdropImage: backdrop,
-    primaryAction: {
-      label: 'Book Now',
+    primaryAction: raw.primaryAction || {
+      label: raw.hasLiveShows ? 'Book Seats' : 'Book Now',
       icon: 'ticket',
-      link: `/book/${id}`,
+      link: raw.dbMovieId ? `/book/${raw.dbMovieId}` : `/book/${id}`,
     },
-    secondaryAction: {
+    secondaryAction: raw.secondaryAction || {
       label: 'More Info',
       link: `/movie/${id}`,
     },
     statusCategory: raw.statusCategory || 'now',
-    duration: raw.durationMinutes
+    duration: raw.duration || (raw.durationMinutes
       ? `${Math.floor(raw.durationMinutes / 60)}h ${raw.durationMinutes % 60}m`
-      : (raw.duration || ''),
+      : ''),
+    durationMinutes: raw.durationMinutes || 120,
     director: raw.director || '',
-    cast: Array.isArray(raw.castMembers) ? raw.castMembers : [],
+    cast: Array.isArray(raw.cast) && raw.cast.length > 0 ? raw.cast : (Array.isArray(raw.castMembers) ? raw.castMembers : []),
+    castMembers: Array.isArray(raw.castMembers) ? raw.castMembers : [],
     trailerUrl: raw.trailerUrl || '',
+    trailerKey: raw.trailerKey || null,
+    hasLiveShows: Boolean(raw.hasLiveShows),
+    dbMovieId: raw.dbMovieId || null,
+    shows: Array.isArray(raw.shows) ? raw.shows : [],
     priceRM: raw.priceRM || 250,
-    category: 'movie',
+    category: raw.category || 'movie',
+    attribution: raw.attribution || 'This product uses the TMDB API but is not endorsed or certified by TMDB.',
   };
 }
+
 
 export const api = {
   // ==================== AUTHENTICATION ====================
@@ -730,6 +738,119 @@ export const api = {
       return DEFAULT_FALLBACK_MOVIES.find(m => m.id === id) || null;
     }
   },
+
+  // TMDB Endpoints
+  async getNowPlaying(page = 1) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/movies/now-playing?page=${page}`);
+      if (res.ok) {
+        const result = await res.json();
+        const rawList = result.movies || result.data || [];
+        if (rawList.length > 0) {
+          return rawList.map((item, idx) => normalizeMediaItem(item, idx));
+        }
+      }
+      return this.getMovies();
+    } catch {
+      return this.getMovies();
+    }
+  },
+
+  async getUpcoming(page = 1) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/movies/upcoming?page=${page}`);
+      if (res.ok) {
+        const result = await res.json();
+        const rawList = result.movies || result.data || [];
+        if (rawList.length > 0) {
+          return rawList.map((item, idx) => normalizeMediaItem(item, idx));
+        }
+      }
+      return DEFAULT_FALLBACK_MOVIES;
+    } catch {
+      return DEFAULT_FALLBACK_MOVIES;
+    }
+  },
+
+  async getTrending(window = 'week', page = 1) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/movies/trending?window=${window}&page=${page}`);
+      if (res.ok) {
+        const result = await res.json();
+        const rawList = result.movies || result.data || [];
+        if (rawList.length > 0) {
+          return rawList.map((item, idx) => normalizeMediaItem(item, idx));
+        }
+      }
+      return this.getMovies();
+    } catch {
+      return this.getMovies();
+    }
+  },
+
+  async getPopular(page = 1) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/movies/popular?page=${page}`);
+      if (res.ok) {
+        const result = await res.json();
+        const rawList = result.movies || result.data || [];
+        if (rawList.length > 0) {
+          return rawList.map((item, idx) => normalizeMediaItem(item, idx));
+        }
+      }
+      return this.getMovies();
+    } catch {
+      return this.getMovies();
+    }
+  },
+
+  async getMovieTrailers(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/movies/${encodeURIComponent(id)}/trailers`);
+      if (res.ok) {
+        const result = await res.json();
+        return result.trailers || [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  async searchMovies(query, page = 1) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/movies/search?q=${encodeURIComponent(query)}&page=${page}`);
+      if (res.ok) {
+        const result = await res.json();
+        const rawList = result.movies || result.data || [];
+        return rawList.map((item, idx) => normalizeMediaItem(item, idx));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  async search(query) {
+    if (!query || !query.trim()) return { movies: [], theatres: [], events: [] };
+    try {
+      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          movies: (data.movies || []).map((m, idx) => normalizeMediaItem(m, idx)),
+          theatres: data.theatres || [],
+          events: (data.events || []).map((e, idx) => normalizeMediaItem(e, idx)),
+        };
+      }
+      return { movies: [], theatres: [], events: [] };
+    } catch {
+      return { movies: [], theatres: [], events: [] };
+    }
+  },
+
+
+
 
   // Events, Streams, Plays, Sports, Activities
   async getEvents() {
@@ -963,14 +1084,15 @@ export const api = {
     return data;
   },
 
-  // Unified Search
-  async search(query) {
+  // Unified Search with Category Context
+  async search(query, category = '') {
     try {
-      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) return { movies: [], theatres: [] };
+      const catParam = category ? `&category=${encodeURIComponent(category)}` : '';
+      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}${catParam}`);
+      if (!res.ok) return { movies: [], theatres: [], events: [], sports: [], plays: [], activities: [] };
       return await res.json();
     } catch {
-      return { movies: [], theatres: [] };
+      return { movies: [], theatres: [], events: [], sports: [], plays: [], activities: [] };
     }
   },
 

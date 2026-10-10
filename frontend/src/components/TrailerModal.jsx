@@ -37,27 +37,57 @@ export const TrailerModal = ({ item, isOpen, onClose, onOpenBooking, }) => {
 
         {/* Video Player Canvas */}
         <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden group">
-          {item.trailerUrl ? (<iframe src={item.trailerUrl} title={`${item.title} Trailer`} className="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen/>) : (<div className="relative w-full h-full">
-              <img src={item.backdropImage} alt={item.title} className="w-full h-full object-cover brightness-75 scale-105 transition-transform duration-1000 group-hover:scale-110"/>
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent"/>
-              
-              {/* Simulated Ambient Player HUD */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#f5a623] text-black flex items-center justify-center shadow-[0_0_30px_#f5a623] cursor-pointer hover:scale-110 transition-transform">
-                  <svg className="w-8 h-8 fill-black translate-x-0.5" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
+          {(() => {
+            let embedUrl = null;
+            if (item.trailerKey) {
+              embedUrl = `https://www.youtube.com/embed/${item.trailerKey}?autoplay=1`;
+            } else if (item.trailerUrl) {
+              if (item.trailerUrl.includes('embed/')) {
+                embedUrl = item.trailerUrl;
+              } else if (item.trailerUrl.includes('watch?v=')) {
+                embedUrl = item.trailerUrl.replace('watch?v=', 'embed/') + '?autoplay=1';
+              } else if (item.trailerUrl.includes('youtu.be/')) {
+                const vidId = item.trailerUrl.split('youtu.be/')[1]?.split('?')[0];
+                if (vidId) embedUrl = `https://www.youtube.com/embed/${vidId}?autoplay=1`;
+              }
+            }
+
+            return embedUrl ? (
+              <iframe
+                src={embedUrl}
+                title={`${item.title} Trailer`}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <div className="relative w-full h-full">
+                <img
+                  src={item.backdropImage || item.posterImage}
+                  alt={item.title}
+                  className="w-full h-full object-cover brightness-75 scale-105 transition-transform duration-1000 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+                  <span className="text-white font-heading font-bold text-base sm:text-lg drop-shadow">
+                    Official Preview Available on YouTube
+                  </span>
+                  {item.trailerUrl && (
+                    <a
+                      href={item.trailerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 px-4 py-2 rounded-xl bg-[#f5a623] text-black font-semibold text-xs flex items-center gap-1.5"
+                    >
+                      Open Trailer on YouTube
+                    </a>
+                  )}
                 </div>
-                <span className="text-white font-heading font-bold text-base sm:text-lg mt-4 drop-shadow">
-                  High Bitrate 4K HDR Atmos Preview
-                </span>
-                <span className="text-xs text-neutral-300 mt-1 flex items-center gap-1.5">
-                  <Volume2 className="w-3.5 h-3.5 text-[#f5a623]"/>
-                  Dolby 7.1 Surround Sound Master
-                </span>
               </div>
-            </div>)}
+            );
+          })()}
         </div>
+
 
         {/* Bottom Details & Booking Bar */}
         <div className="p-6 bg-[#0c0d14] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

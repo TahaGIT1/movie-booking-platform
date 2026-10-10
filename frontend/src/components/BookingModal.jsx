@@ -52,10 +52,11 @@ export const BookingModal = ({ item, onClose }) => {
 
     // Compute showtimes
     const showtimes = useMemo(() => {
+        const targetMovieId = item?.dbMovieId || item?.id;
         const theatreObj = theatres.find((t) => t.name === selectedTheatre || t.id === selectedTheatre);
         if (theatreObj?.screens) {
             const shows = theatreObj.screens.flatMap((s) => s.shows || []);
-            const movieShows = shows.filter((sh) => !sh.isCancelled && (sh.movieId === item?.id || !item?.id));
+            const movieShows = shows.filter((sh) => !sh.isCancelled && (sh.movieId === targetMovieId || !targetMovieId));
             if (movieShows.length > 0) {
                 return Array.from(new Set(movieShows.map((sh) => {
                     const d = new Date(sh.startTime);
@@ -64,7 +65,8 @@ export const BookingModal = ({ item, onClose }) => {
             }
         }
         return ['11:30 AM', '02:45 PM', '06:30 PM', '09:45 PM'];
-    }, [theatres, selectedTheatre, item?.id]);
+    }, [theatres, selectedTheatre, item?.id, item?.dbMovieId]);
+
 
     useEffect(() => {
         if (showtimes.length > 0 && (!selectedTime || !showtimes.includes(selectedTime))) {
