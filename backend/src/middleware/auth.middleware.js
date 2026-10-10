@@ -13,8 +13,11 @@ export const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, env.JWT_SECRET);
 
+    const userId = decoded.userId || decoded.id;
+    if (!userId) throw new AppError(401, 'Invalid token payload', 'INVALID_TOKEN');
+
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: userId },
       select: { id: true, role: true, theatreId: true, isBlocked: true, fullName: true, email: true }
     });
 
@@ -45,12 +48,15 @@ export const optionalAuthenticate = async (req, res, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, env.JWT_SECRET);
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: { id: true, role: true, theatreId: true, isBlocked: true, fullName: true, email: true }
-      });
-      if (user && !user.isBlocked) {
-        req.user = user;
+      const userId = decoded.userId || decoded.id;
+      if (userId) {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, role: true, theatreId: true, isBlocked: true, fullName: true, email: true }
+        });
+        if (user && !user.isBlocked) {
+          req.user = user;
+        }
       }
     }
   } catch {

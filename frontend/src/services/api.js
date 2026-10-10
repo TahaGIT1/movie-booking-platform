@@ -387,4 +387,37 @@ export const api = {
       return { movies: [], theatres: [] };
     }
   },
+
+  // Admin Movie Operations
+  async createMovie(movieData) {
+    const res = await fetch(`${API_BASE_URL}/admin/movies`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(movieData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to create movie');
+    return data.data;
+  },
+
+  async updateMovie(movieId, movieData) {
+    const res = await fetch(`${API_BASE_URL}/admin/movies/${movieId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(movieData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update movie');
+    return data.data;
+  },
+
+  async deleteMovie(movieId) {
+    const res = await fetch(`${API_BASE_URL}/admin/movies/${movieId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to delete movie');
+    return data;
+  },
 };
