@@ -23,7 +23,8 @@ export const NowShowingGrid: React.FC<NowShowingGridProps> = ({
 
   const filteredItems = items.filter((item) => {
     if (selectedFormat === 'All') return true;
-    return item.formats.some((f) => f.toLowerCase().includes(selectedFormat.toLowerCase()));
+    const itemFormats = Array.isArray(item.formats) ? item.formats : [];
+    return itemFormats.some((f) => f.toLowerCase().includes(selectedFormat.toLowerCase()));
   });
 
   return (

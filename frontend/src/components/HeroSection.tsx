@@ -19,14 +19,28 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ config, onOpenBooking 
 
   const currentItem = config.items[selectedIndex] || config.items[0];
 
+  if (!currentItem) {
+    return null;
+  }
+
+  const formats = Array.isArray(currentItem.formats) && currentItem.formats.length > 0
+    ? currentItem.formats
+    : ['2D', 'IMAX'];
+
+  const primaryAction = currentItem.primaryAction || {
+    label: 'Book Now',
+    icon: 'ticket',
+    link: `/book/${currentItem.id}`,
+  };
+
   return (
     <div className="relative w-full min-h-[calc(100vh-5rem)] flex flex-col justify-between overflow-hidden">
       {/* Background Image with Cinematic Gradient Overlays */}
       <div className="absolute inset-0 z-0">
         <img
-          src={currentItem.backdropImage}
-          alt={currentItem.title}
-          key={currentItem.backdropImage}
+          src={currentItem.backdropImage || currentItem.posterImage || '/images/backgrounds/batman_hero.jpg'}
+          alt={currentItem.title || 'Movie'}
+          key={currentItem.backdropImage || currentItem.id}
           className="w-full h-full object-cover object-center animate-in fade-in duration-700 transform scale-105"
           onError={(e) => {
             (e.target as HTMLImageElement).src = '/images/backgrounds/batman_hero.jpg';
@@ -61,7 +75,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ config, onOpenBooking 
               <span className="w-2.5 h-2.5 rounded-full bg-white mt-1 shrink-0 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
               <div>
                 <div className="text-sm sm:text-base font-semibold text-white tracking-wide">
-                  {config.statusLabelLeft || currentItem.scheduleStatus}
+                  {config.statusLabelLeft || currentItem.scheduleStatus || 'Now Showing'}
                 </div>
                 <div className="text-xs sm:text-sm text-neutral-400">
                   {config.statusSubLeft || currentItem.scheduleLabel || currentItem.tagline || 'Special presentation'}
@@ -72,7 +86,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ config, onOpenBooking 
             {/* Massive Index Number + Title */}
             <div className="flex items-baseline gap-3 sm:gap-4 my-1 sm:my-2">
               <span className="text-5xl sm:text-7xl lg:text-8xl font-heading font-black tracking-tight text-white/95 select-none leading-none">
-                {currentItem.indexNumber}
+                {currentItem.indexNumber || '01'}
               </span>
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-heading font-bold text-white tracking-tight leading-tight">
                 {currentItem.title}
@@ -81,14 +95,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ config, onOpenBooking 
 
             {/* Rating Stars + Genre + Badges Row */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 mb-4">
-              <Rating score={currentItem.rating} />
+              <Rating score={typeof currentItem.rating === 'number' ? currentItem.rating : 4.5} />
               
               <span className="text-xs sm:text-sm text-neutral-300 font-medium">
-                Genre: <span className="text-neutral-400">{currentItem.genre}</span>
+                Genre: <span className="text-neutral-400">{currentItem.genre || 'Action'}</span>
               </span>
 
               <div className="flex items-center gap-1.5">
-                {currentItem.formats.map((fmt) => (
+                {formats.map((fmt) => (
                   <Badge key={fmt} variant="outline">
                     {fmt}
                   </Badge>
@@ -98,21 +112,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ config, onOpenBooking 
 
             {/* Synopsis / Description */}
             <p className="text-xs sm:text-sm md:text-base text-neutral-300 leading-relaxed line-clamp-3 sm:line-clamp-4 mb-6 sm:mb-8 font-normal max-w-xl">
-              {currentItem.description}
+              {currentItem.description || 'Experience this cinematic release on the big screen.'}
             </p>
 
             {/* Action Buttons: Book Now (Gold) + More Info (Dark) */}
             <div className="flex items-center gap-3 sm:gap-4">
               <PrimaryButton
-                icon={currentItem.primaryAction.icon || (config.pageType === 'streams' ? 'play' : 'ticket')}
+                icon={primaryAction.icon || (config.pageType === 'streams' ? 'play' : 'ticket')}
                 onClick={() => {
                   if (onOpenBooking && config.pageType !== 'streams') {
                     onOpenBooking(currentItem);
                   }
                 }}
-                to={config.pageType === 'streams' ? currentItem.primaryAction.link : undefined}
+                to={config.pageType === 'streams' ? primaryAction.link : undefined}
               >
-                {currentItem.primaryAction.label}
+                {primaryAction.label || 'Book Now'}
               </PrimaryButton>
 
               <SecondaryButton to={currentItem.secondaryAction?.link || `/movie/${currentItem.id}`}>

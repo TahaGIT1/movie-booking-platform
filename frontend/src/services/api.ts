@@ -80,6 +80,64 @@ export interface SeatStatusItem {
   };
 }
 
+export function normalizeMediaItem(raw: any, index: number = 0): MediaItem {
+  if (!raw) return moviesData[0];
+
+  // Match against local rich moviesData to preserve high-res posters/backdrops if known title/id
+  const localMatch = moviesData.find(
+    (m) => m.id === raw.id || m.title?.toLowerCase() === raw.title?.toLowerCase()
+  );
+
+  const id = String(raw.id || localMatch?.id || `movie-${index + 1}`);
+  const title = raw.title || localMatch?.title || 'Featured Film';
+  const rawGenres = Array.isArray(raw.genres) && raw.genres.length > 0
+    ? raw.genres
+    : (typeof raw.genres === 'string'
+      ? raw.genres.split(',').map((g: string) => g.trim())
+      : (localMatch?.genreTags || ['Action', 'Drama']));
+
+  const censor = raw.censorCertificate || 'UA';
+  const rawFormats = Array.isArray(raw.formats) && raw.formats.length > 0
+    ? raw.formats
+    : (localMatch?.formats || [censor, '2D', 'IMAX']);
+
+  return {
+    id,
+    indexNumber: raw.indexNumber || localMatch?.indexNumber || String(index + 1).padStart(2, '0'),
+    title,
+    tagline: raw.tagline || localMatch?.tagline || rawGenres.join(' • ') || 'Now in Theatres',
+    scheduleStatus: raw.scheduleStatus || localMatch?.scheduleStatus || 'Tomorrow',
+    scheduleLabel: raw.scheduleLabel || localMatch?.scheduleLabel || 'Session schedule',
+    heroBadge: raw.heroBadge || localMatch?.heroBadge || (index === 0 ? 'BLOCKBUSTER' : 'Featured'),
+    badgeTopRight: raw.badgeTopRight || localMatch?.badgeTopRight || 'Tomorrow',
+    rating: typeof raw.rating === 'number' ? raw.rating : (localMatch?.rating || 4.5),
+    genre: raw.genre || localMatch?.genre || rawGenres.join(', '),
+    genreTags: rawGenres,
+    formats: rawFormats,
+    description: raw.synopsis || raw.description || localMatch?.description || 'Experience this cinematic release on the big screen.',
+    posterImage: raw.posterUrl || raw.posterImage || localMatch?.posterImage || '/images/movies/the-batman.jpg',
+    backdropImage: raw.backdropUrl || raw.backdropImage || localMatch?.backdropImage || raw.posterUrl || '/images/backgrounds/batman_hero.jpg',
+    primaryAction: raw.primaryAction || localMatch?.primaryAction || {
+      label: 'Book Now',
+      icon: 'ticket',
+      link: `/book/${id}`,
+    },
+    secondaryAction: raw.secondaryAction || localMatch?.secondaryAction || {
+      label: 'More Info',
+      link: `/movie/${id}`,
+    },
+    statusCategory: raw.statusCategory || localMatch?.statusCategory || 'now',
+    duration: raw.duration || (raw.durationMinutes ? `${Math.floor(raw.durationMinutes / 60)}h ${raw.durationMinutes % 60}m` : (localMatch?.duration || '2h 15m')),
+    director: raw.director || localMatch?.director || 'Director',
+    cast: Array.isArray(raw.castMembers)
+      ? raw.castMembers
+      : (Array.isArray(raw.cast) ? raw.cast : (localMatch?.cast || ['Lead Cast'])),
+    trailerUrl: raw.trailerUrl || localMatch?.trailerUrl || '',
+    priceRM: raw.priceRM || localMatch?.priceRM || 25,
+    category: 'movie',
+  };
+}
+
 export const api = {
   // ==================== AUTHENTICATION ====================
   getToken(): string | null {
@@ -209,7 +267,8 @@ export const api = {
       const res = await fetch(`${API_BASE_URL}/movies${qs}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json();
-      return Array.isArray(result) ? result : result.data || moviesData;
+      const rawList = Array.isArray(result) ? result : (result.data || moviesData);
+      return rawList.map((item: any, idx: number) => normalizeMediaItem(item, idx));
     } catch (err) {
       console.warn('Falling back to local movies data:', err);
       let list = [...moviesData];
@@ -223,7 +282,8 @@ export const api = {
       const res = await fetch(`${API_BASE_URL}/movies/${encodeURIComponent(id)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json();
-      return result.data || result;
+      const raw = result.data || result;
+      return raw ? normalizeMediaItem(raw, 0) : moviesData.find((m) => m.id === id);
     } catch {
       return moviesData.find((m) => m.id === id);
     }
