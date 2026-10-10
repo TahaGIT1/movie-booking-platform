@@ -1,4 +1,18 @@
 node_modules/
 dist/
+
+# Secrets
 .env
-.env.local
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Agent-specific skill directories
+/.agents/skills/
+/.claude/skills/
+/.windsurf/skills/
+
+# Neon project-link metadata
+/.neon
