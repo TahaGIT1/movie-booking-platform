@@ -32,5 +32,8 @@
     "pg": "^8.23.1",
     "socket.io": "^4.8.4",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.3"
   }
 }
