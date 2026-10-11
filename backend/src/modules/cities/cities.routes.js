@@ -24,12 +24,13 @@ async function getAllCities() {
       if (!t.city) return;
       const normalizedId = t.city.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
       if (!citiesMap.has(normalizedId)) {
+        const isIndia = /karnataka|maharashtra|delhi|tamil nadu|telangana|west bengal|gujarat|rajasthan|punjab|kerala|india|belagavi/i.test((t.city || '') + ' ' + (t.state || ''));
         citiesMap.set(normalizedId, {
           id: normalizedId,
           name: t.city,
           state: t.state || '',
-          country: 'Malaysia',
-          countryCode: 'MY',
+          country: isIndia ? 'India' : 'Malaysia',
+          countryCode: isIndia ? 'IN' : 'MY',
           isPopular: false,
         });
       }
