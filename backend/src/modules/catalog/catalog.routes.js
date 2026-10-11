@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { prisma } from '../../config/prisma.js';
 import { ticketmasterService } from '../../services/ticketmaster.service.js';
+import { INDIAN_LIVE_EVENTS } from '../../data/indianEvents.data.js';
+import { getRealTimeIndianEvents } from '../../services/district.service.js';
 
 const router = Router();
 
@@ -151,59 +153,64 @@ function formatCatalogItem(item, defaultCategory = 'event') {
   };
 }
 
-// 1. Events (Concerts, Music Festivals, Live Tours)
+// 1. Events (Shows, Stand-up Comedy, Concerts, Festivals in India - District by Zomato style)
 router.get('/events', async (req, res, next) => {
   try {
-    const { search, city, page = 1 } = req.query;
-    const isIndianCity = city && !/global|all|united|london|york|singapore/i.test(city);
+    const { search, city, category, page = 1, size = 20 } = req.query;
 
-    // Query DB for Indian live music/festival tours
-    const where = {
-      OR: [
-        { title: { contains: 'Tour', mode: 'insensitive' } },
-        { title: { contains: 'Festival', mode: 'insensitive' } },
-        { title: { contains: 'Concert', mode: 'insensitive' } },
-        { title: { contains: 'Sunburn', mode: 'insensitive' } },
-        { title: { contains: 'Diljit', mode: 'insensitive' } },
-        { title: { contains: 'Keinemusik', mode: 'insensitive' } },
-        { title: { contains: 'Roses', mode: 'insensitive' } },
-        { title: { contains: 'Fighters', mode: 'insensitive' } },
-        { title: { contains: 'Circus', mode: 'insensitive' } },
-      ],
-    };
+    const allEvents = await getRealTimeIndianEvents();
+    let filtered = [...allEvents];
 
+    // Filter by Indian city
+    if (city && city.toLowerCase() !== 'all' && city.toLowerCase() !== 'all events') {
+      const targetCity = city.toLowerCase().trim();
+      filtered = filtered.filter((ev) => {
+        if (ev.cities && ev.cities.some((c) => c.toLowerCase().includes(targetCity) || targetCity.includes(c.toLowerCase()))) {
+          return true;
+        }
+        return ev.city.toLowerCase().includes(targetCity) || targetCity.includes(ev.city.toLowerCase());
+      });
+    }
+
+    // Filter by category
+    if (category && category.toLowerCase() !== 'all') {
+      const cat = category.toLowerCase().trim();
+      filtered = filtered.filter((ev) => {
+        if (cat.includes('comedy') || cat.includes('laugh')) return ev.category === 'comedy';
+        if (cat.includes('music') || cat.includes('concert')) return ev.category === 'music';
+        if (cat.includes('theatre') || cat.includes('art')) return ev.category === 'theatre';
+        if (cat.includes('festival')) return ev.category === 'festivals';
+        return ev.category === cat;
+      });
+    }
+
+    // Search query
     if (search) {
-      where.OR.push({ title: { contains: search, mode: 'insensitive' } });
-    }
-    if (city && isIndianCity) {
-      where.title = { contains: city.trim(), mode: 'insensitive' };
-    }
-
-    const [dbItems, tmResult] = await Promise.all([
-      prisma.movie.findMany({ where, orderBy: { createdAt: 'desc' } }).catch(() => []),
-      ticketmasterService
-        .getMusic({
-          keyword: search || undefined,
-          city: !isIndianCity ? city : undefined,
-          countryCode: isIndianCity ? 'IN' : undefined,
-          page: Math.max(0, parseInt(page, 10) - 1),
-          size: 12,
-        })
-        .catch(() => ({ events: [] })),
-    ]);
-
-    const formattedDb = dbItems.map((item) => formatCatalogItem(item, 'event'));
-
-    // Requirement 8: For target Indian cities, do not substitute unrelated foreign events if 0 exist
-    let merged = [];
-    if (isIndianCity) {
-      merged = formattedDb;
-    } else {
-      // Global exploration: combine curated Indian events + live Ticketmaster music events
-      merged = [...formattedDb, ...(tmResult.events || [])];
+      const q = search.toLowerCase().trim();
+      filtered = filtered.filter((ev) =>
+        ev.title.toLowerCase().includes(q) ||
+        ev.venue.toLowerCase().includes(q) ||
+        ev.city.toLowerCase().includes(q)
+      );
     }
 
-    res.json(merged.map((e, idx) => ({ ...e, indexNumber: String(idx + 1).padStart(2, '0') })));
+    const mapped = filtered.map((e, idx) => ({
+      ...e,
+      indexNumber: String(idx + 1).padStart(2, '0'),
+      primaryAction: {
+        label: 'Get Tickets',
+        icon: 'ticket',
+        external: true,
+        link: e.ticketUrl,
+      },
+      secondaryAction: {
+        label: 'More Info',
+        link: e.ticketUrl,
+        external: true,
+      },
+    }));
+
+    return res.json(mapped);
   } catch (err) {
     next(err);
   }

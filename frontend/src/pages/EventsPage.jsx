@@ -122,13 +122,25 @@ export const EventsPage = () => {
                       >
                         Info
                       </Link>
-                      <button
-                        onClick={() => setBookingItem(item)}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#f5a623] hover:bg-[#d48b17] text-black text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#f5a623]/20"
-                      >
-                        <Ticket className="w-3.5 h-3.5" />
-                        <span>Book</span>
-                      </button>
+                      {item.ticketUrl ? (
+                        <a
+                          href={item.ticketUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3.5 py-1.5 rounded-xl bg-[#f5a623] hover:bg-[#d48b17] text-black text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#f5a623]/20"
+                        >
+                          <Ticket className="w-3.5 h-3.5" />
+                          <span>Get Tickets</span>
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => setBookingItem(item)}
+                          className="px-3.5 py-1.5 rounded-xl bg-[#f5a623] hover:bg-[#d48b17] text-black text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#f5a623]/20"
+                        >
+                          <Ticket className="w-3.5 h-3.5" />
+                          <span>Book</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -177,16 +177,27 @@ export function formatTmEvent(event, index = 0, defaultCategory = 'event') {
   const statusCode = event.dates?.status?.code;
   const scheduleStatus = statusCode === 'onsale' ? 'On Sale' : statusCode === 'rescheduled' ? 'Rescheduled' : 'Live Event';
 
+  // Video preview support: check event videos, attraction videos, or media
+  const attractionObj = event._embedded?.attractions?.[0] || {};
+  let videoUrl = null;
+  if (Array.isArray(event.videos) && event.videos[0]?.url) {
+    videoUrl = event.videos[0].url;
+  } else if (Array.isArray(attractionObj.videos) && attractionObj.videos[0]?.url) {
+    videoUrl = attractionObj.videos[0].url;
+  }
+
   // Price & Ticket Link
   const priceRanges = event.priceRanges?.[0];
   let priceStr = '';
-  let priceVal = 150;
+  let priceVal = 499;
   if (priceRanges) {
-    priceStr = `${priceRanges.min || ''} ${priceRanges.currency || 'USD'}`;
-    if (priceRanges.max && priceRanges.max !== priceRanges.min) {
-      priceStr = `${priceRanges.min} – ${priceRanges.max} ${priceRanges.currency}`;
+    const symbol = priceRanges.currency === 'INR' ? '₹' : priceRanges.currency === 'USD' ? '$' : priceRanges.currency === 'EUR' ? '€' : priceRanges.currency === 'GBP' ? '£' : (priceRanges.currency || '₹');
+    if (priceRanges.min !== undefined) {
+      priceStr = priceRanges.max && priceRanges.max !== priceRanges.min
+        ? `${symbol}${priceRanges.min} – ${symbol}${priceRanges.max}`
+        : `${symbol}${priceRanges.min} onwards`;
+      priceVal = priceRanges.min;
     }
-    priceVal = priceRanges.min || 150;
   }
 
   const ticketUrl = event.url || null;
@@ -206,6 +217,7 @@ export function formatTmEvent(event, index = 0, defaultCategory = 'event') {
     synopsis: description,
     posterImage,
     backdropImage,
+    videoUrl,
     genre: genreStr,
     genreTags: genreTags.length > 0 ? genreTags : ['Live Event'],
     formats: ['LIVE', cityName ? cityName.toUpperCase() : 'TOUR'].filter(Boolean),
@@ -221,7 +233,7 @@ export function formatTmEvent(event, index = 0, defaultCategory = 'event') {
     badgeTopRight: cityName || 'Official Tour',
     rating: 4.8,
     duration: '2h 30m',
-    price: priceStr,
+    price: priceStr || 'Tickets Available',
     priceRM: priceVal,
     ticketUrl,
     isExternalTicket: Boolean(ticketUrl),
@@ -246,12 +258,16 @@ export const ticketmasterService = {
   /**
    * Search / discover events with optional keyword, city, country, or classification
    */
-  async getEvents({ keyword, city, countryCode, classificationName, page = 0, size = 20 } = {}) {
+  async getEvents({ keyword, city, countryCode, classificationName, page = 0, size = 20, sort = 'relevance,desc', upcomingOnly = true } = {}) {
     const params = {
       size,
       page,
-      sort: 'date,asc',
+      sort,
     };
+
+    if (upcomingOnly) {
+      params.startDateTime = new Date().toISOString().split('.')[0] + 'Z';
+    }
 
     if (keyword) params.keyword = keyword;
     if (city) params.city = city;

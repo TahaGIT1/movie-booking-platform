@@ -4,9 +4,8 @@ import { api, DEFAULT_FALLBACK_MOVIES } from '../services/api';
 import { BookingModal } from '../components/BookingModal';
 import { TrailerModal } from '../components/TrailerModal';
 import { NowShowingGrid } from '../components/NowShowingGrid';
-import { ExperienceBanners } from '../components/ExperienceBanners';
+import { UpcomingEventsSection } from '../components/UpcomingEventsSection';
 import { TheatresSection } from '../components/TheatresSection';
-import { OffersSection } from '../components/OffersSection';
 
 // High-fidelity Hero Skeleton to eliminate Layout Shift (CLS) on initial mount
 const HeroSkeleton = () => (
@@ -166,8 +165,8 @@ export const HomePage = () => {
         </div>
       )}
 
-      {/* 3. PREMIUM AUDITORIUM FORMATS */}
-      <ExperienceBanners />
+      {/* 3. UPCOMING EVENTS & LIVE EXPERIENCES (DISTRICT STYLE) */}
+      <UpcomingEventsSection />
 
       {/* 4. THEATRES & SHOWTIMES NEAR YOU */}
       <TheatresSection
@@ -177,9 +176,6 @@ export const HomePage = () => {
           }
         }}
       />
-
-      {/* 5. CINEMA OFFERS & PROMOTIONS */}
-      <OffersSection />
 
       {/* Interactive Cinema Seat Booking Modal */}
       {bookingItem && (

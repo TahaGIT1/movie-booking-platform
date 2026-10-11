@@ -997,18 +997,40 @@ export const api = {
 
 
   // Events, Streams, Plays, Sports, Activities
-  async getEvents(city) {
+  async getEvents(opts = {}) {
     try {
-      const url = city ? `${API_BASE_URL}/events?city=${encodeURIComponent(city)}` : `${API_BASE_URL}/events`;
-      const res = await fetch(url);
+      let city = '';
+      let category = '';
+      let search = '';
+      let page = '';
+      let size = '';
+
+      if (typeof opts === 'string') {
+        city = opts;
+      } else if (opts && typeof opts === 'object') {
+        city = opts.city || '';
+        category = opts.category || '';
+        search = opts.search || '';
+        page = opts.page || '';
+        size = opts.size || '';
+      }
+
+      const params = new URLSearchParams();
+      if (city) params.set('city', city);
+      if (category) params.set('category', category);
+      if (search) params.set('search', search);
+      if (page) params.set('page', page);
+      if (size) params.set('size', size);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/events${queryStr}`);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
+        return list;
       }
-      return DEFAULT_FALLBACK_EVENTS;
+      return [];
     } catch {
-      return DEFAULT_FALLBACK_EVENTS;
+      return [];
     }
   },
 
