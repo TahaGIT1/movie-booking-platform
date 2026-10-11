@@ -94,7 +94,7 @@ export const BookingsHistoryPage = () => {
                         {b.seats.join(', ')}
                       </span>
                       <span className="text-neutral-500 ml-3">Paid: </span>
-                      <span className="text-white font-medium">RM {b.totalAmount.toFixed(2)}</span>
+                      <span className="text-white font-medium">₹{b.totalAmount.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -112,7 +112,7 @@ export const BookingsHistoryPage = () => {
       {/* QR Code Inspection Modal */}
       {activeQrModal && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#141722] border border-white/15 rounded-2xl p-6 sm:p-8 max-w-sm w-full text-center space-y-5 relative shadow-2xl">
-            <button onClick={() => setActiveQrModal(null)} className="absolute top-4 right-4 p-1.5 rounded-lg text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors">
+            <button onClick={() => setActiveQrModal(null)} aria-label="Close ticket QR" className="absolute top-4 right-4 p-1.5 rounded-lg text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
               <X className="w-4 h-4"/>
             </button>
 
@@ -142,7 +142,7 @@ export const BookingsHistoryPage = () => {
                 <div className="text-center font-bold tracking-widest text-[10px]">
                   CINEPASS VERIFIED
                   <div className="text-[8px] text-neutral-600 font-normal mt-0.5">
-                    {activeQrModal.seats.join(', ')} • RM {activeQrModal.totalAmount}
+                    {activeQrModal.seats.join(', ')} • ₹{activeQrModal.totalAmount}
                   </div>
                 </div>
                 <div className="flex justify-between items-end">

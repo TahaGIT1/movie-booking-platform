@@ -31,7 +31,7 @@ export const ProfilePage = () => {
               </span>
               <span className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#f5a623]"/>
-                Kuala Lumpur, Malaysia
+                Belagavi, Karnataka
               </span>
             </div>
           </div>

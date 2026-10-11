@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Search, Menu, X, MapPin, ChevronDown, User, Tag, Film, LogOut, Building2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { LOCATIONS, DEFAULT_LOCATION } from '../constants/locations';
 
 export const Navbar = ({ onOpenSearch }) => {
     const { user, token, logout, openAuthModal } = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [selectedLocation, setSelectedLocation] = useState('Malaysia, Global');
+    const [selectedLocation, setSelectedLocation] = useState(DEFAULT_LOCATION.label);
     const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
     const location = useLocation();
 
@@ -23,14 +24,7 @@ export const Navbar = ({ onOpenSearch }) => {
         { label: 'Activities', path: '/activities' },
     ];
 
-    const locations = [
-        'Malaysia, Global',
-        'Kuala Lumpur, MY',
-        'Petaling Jaya, MY',
-        'Penang, MY',
-        'Johor Bahru, MY',
-        'Singapore, SG',
-    ];
+    const locations = LOCATIONS.map((entry) => entry.label);
 
     const isLinkActive = (path) => {
         if (path === '/') return location.pathname === '/';
@@ -212,6 +206,7 @@ export const Navbar = ({ onOpenSearch }) => {
                                 </Link>
                                 <button
                                     onClick={() => setMobileMenuOpen(false)}
+                                    aria-label="Close navigation menu"
                                     className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
                                 >
                                     <X className="w-5 h-5" />

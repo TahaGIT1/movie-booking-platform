@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { HeroSection } from '../components/HeroSection';
 import { TrailerModal } from '../components/TrailerModal';
 import { api } from '../services/api';
-import { Play } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { CardSkeletonGrid } from '../components/CardSkeletonGrid';
+import { Play, Tv } from 'lucide-react';
 
 const IMDB_RATINGS = {
   'obsession': '7.6',
@@ -85,6 +87,7 @@ const getStreamImdbRating = (title, fallback) => {
 export const StreamsPage = () => {
   const [streams, setStreams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [trailerItem, setTrailerItem] = useState(null);
 
   const playTrailer = (item) => {
@@ -101,11 +104,13 @@ export const StreamsPage = () => {
     api.getStreams().then((data) => {
       if (isMounted) {
         setStreams(Array.isArray(data) ? data : []);
+        setFailed(false);
         setLoading(false);
       }
     }).catch(() => {
       if (isMounted) {
         setStreams([]);
+        setFailed(true);
         setLoading(false);
       }
     });
@@ -238,13 +243,22 @@ export const StreamsPage = () => {
               </div>
             ))}
           </div>
-        ) : !loading ? (
-          <div className="p-12 text-center rounded-2xl bg-[#11131c] border border-white/10">
-            <div className="text-3xl mb-3">📺</div>
-            <h3 className="text-lg font-bold text-white mb-1">No Streams Found in Database</h3>
-            <p className="text-xs text-neutral-400">There are currently no digital releases available to stream.</p>
-          </div>
-        ) : null}
+        ) : loading ? (
+          <CardSkeletonGrid count={8}/>
+        ) : failed ? (
+          <EmptyState
+            variant="offline"
+            title="Could not load streams"
+            message="We could not reach the listings service. Check that the backend is running, then try again."
+          />
+        ) : (
+          <EmptyState
+            icon={Tv}
+            title="No digital releases yet for Belagavi"
+            message="4K and OTT releases appear here once their streaming windows open for your region."
+            action={{ label: 'Browse movies instead', to: '/' }}
+          />
+        )}
       </section>
 
       {/* Trailer Video Player Modal */}

@@ -7,6 +7,8 @@ import { NowShowingGrid } from '../components/NowShowingGrid';
 import { ExperienceBanners } from '../components/ExperienceBanners';
 import { TheatresSection } from '../components/TheatresSection';
 import { OffersSection } from '../components/OffersSection';
+import { EmptyState } from '../components/EmptyState';
+import { Clapperboard } from 'lucide-react';
 
 // High-fidelity Hero Skeleton to eliminate Layout Shift (CLS) on initial mount
 const HeroSkeleton = () => (
@@ -159,10 +161,13 @@ export const HomePage = () => {
           </div>
         </div>
       ) : (
-        <div className="w-full max-w-[1720px] mx-auto px-6 py-16 text-center">
-          <div className="inline-flex p-4 rounded-full bg-white/5 border border-white/10 mb-4 text-3xl">🎬</div>
-          <h2 className="text-xl font-bold text-white mb-2">No Movies Found in Database</h2>
-          <p className="text-sm text-neutral-400">There are currently no movies scheduled in the database catalog.</p>
+        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-10 py-12 sm:py-16">
+          <EmptyState
+            icon={Clapperboard}
+            title="No upcoming shows in Belagavi yet"
+            message="New releases and now-playing titles appear here once a theatre in your area schedules them. Check back soon."
+            action={{ label: 'Browse theatres', to: '/theatres' }}
+          />
         </div>
       )}
 
