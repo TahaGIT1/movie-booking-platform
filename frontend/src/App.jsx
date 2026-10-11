@@ -30,7 +30,6 @@ const MovieDetailsPage = lazy(() => import('./pages/MovieDetailsPage').then((m) 
 const EventDetailsPage = lazy(() => import('./pages/EventDetailsPage').then((m) => ({ default: m.EventDetailsPage })));
 const BookingPage = lazy(() => import('./pages/BookingPage').then((m) => ({ default: m.BookingPage })));
 const PaymentPage = lazy(() => import('./pages/PaymentPage').then((m) => ({ default: m.PaymentPage })));
-const CheckoutPage = lazy(() => import('./pages/CheckoutPage').then((m) => ({ default: m.CheckoutPage })));
 const BookingsHistoryPage = lazy(() => import('./pages/BookingsHistoryPage').then((m) => ({ default: m.BookingsHistoryPage })));
 // Auth Signups
 const CustomerSignup = lazy(() => import('./pages/auth/CustomerSignup').then((m) => ({ default: m.CustomerSignup })));
@@ -93,7 +92,6 @@ function AppLayout() {
           <Route path="/activities/:id" element={<EventDetailsPage />}/>
           <Route path="/book/:movieId" element={<BookingPage />}/>
           <Route path="/payment" element={<PaymentPage />}/>
-          <Route path="/checkout" element={<CheckoutPage />}/>
           <Route path="/profile" element={<ProfilePage />}/>
           <Route path="/bookings" element={<BookingsHistoryPage />}/>
 

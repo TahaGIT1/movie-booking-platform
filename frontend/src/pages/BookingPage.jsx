@@ -245,13 +245,9 @@ export const BookingPage = () => {
                 customerEmail: currentUser?.email || 'customer@cineverse.com',
             });
             if (response.success && response.booking) {
-                // Continue into the real Razorpay-backed checkout.
-                navigate('/checkout', {
+                navigate('/payment', {
                     state: {
                         booking: {
-                            // bookingId is what the payments API needs to create
-                            // an order; orderId is only the human reference.
-                            bookingId: response.booking.bookingId ?? response.booking.id,
                             orderId: response.booking.orderId,
                             mediaId: response.booking.mediaId,
                             theatreName: response.booking.theatreName,
@@ -259,7 +255,6 @@ export const BookingPage = () => {
                             time: response.booking.time,
                             seats: response.booking.seats,
                             totalAmount: response.booking.totalAmount,
-                            qrCodeData: response.booking.qrCodeData,
                             title: response.booking.title,
                             posterImage: response.booking.posterImage,
                         },

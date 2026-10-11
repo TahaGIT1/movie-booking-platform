@@ -2,34 +2,59 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TicketQr } from '../components/TicketQr';
 import { buildTicketPayload } from '../utils/qrGenerator';
+import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, MapPin, Calendar, Clock, Lock, CreditCard, Smartphone, Building2, AlertCircle, Loader2, Check, Download, Ticket as TicketIcon, } from 'lucide-react';
 /** Convenience fee added for card payments, mirroring a real gateway. */
 const CARD_CONVENIENCE_FEE = 1.5;
 const PROCESSING_DELAY_MS = 2200;
+const BRAND = 'Ticket Total';
 const PAYMENT_METHODS = [
     {
         id: 'card',
         label: 'Credit / Debit Card',
-        description: 'Visa, Mastercard, Amex',
+        description: 'Visa, Mastercard, RuPay, Amex',
         icon: CreditCard,
     },
     {
         id: 'ewallet',
-        label: 'E-Wallet',
-        description: 'Touch n Go, GrabPay, Boost',
+        label: 'UPI / Wallet',
+        description: 'Google Pay, PhonePe, Paytm',
         icon: Smartphone,
     },
     {
         id: 'online-banking',
-        label: 'Online Banking',
-        description: 'FPX, DuitNow transfer',
+        label: 'Net Banking',
+        description: 'All major Indian banks',
         icon: Building2,
     },
 ];
+/**
+ * Luhn checksum. Length alone accepts any 15-16 digit string, so a mistyped
+ * card number would pass validation and only fail much later.
+ */
+function passesLuhn(digits) {
+    let sum = 0;
+    let double = false;
+    for (let i = digits.length - 1; i >= 0; i -= 1) {
+        let d = Number(digits[i]);
+        if (double) {
+            d *= 2;
+            if (d > 9)
+                d -= 9;
+        }
+        sum += d;
+        double = !double;
+    }
+    return sum % 10 === 0;
+}
 function formatCardNumber(value) {
-    return value
-        .replace(/\D/g, '')
-        .slice(0, 16)
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    // Amex groups as 4-6-5; everything else as 4-4-4-4.
+    if (/^3[47]/.test(digits)) {
+        const groups = [digits.slice(0, 4), digits.slice(4, 10), digits.slice(10, 15)];
+        return groups.filter(Boolean).join(' ').trim();
+    }
+    return digits
         .replace(/(.{4})/g, '$1 ')
         .trim();
 }
@@ -68,6 +93,7 @@ export const PaymentPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const routerState = location.state;
+    const { user } = useAuth();
     // Booking data arrives from the seat-selection step via router state.
     const booking = routerState?.booking ?? null;
     const [paymentMethod, setPaymentMethod] = useState('card');
@@ -86,6 +112,7 @@ export const PaymentPage = () => {
     }, [booking, navigate]);
     const convenienceFee = paymentMethod === 'card' ? CARD_CONVENIENCE_FEE : 0;
     const totalPayable = (booking?.totalAmount ?? 0) + convenienceFee;
+    const seatCount = Array.isArray(booking?.seats) ? booking.seats.length : 0;
     const cardBrand = useMemo(() => detectCardBrand(card.number), [card.number]);
     const ticketPayload = useMemo(() => {
         if (!paidBooking)
@@ -103,14 +130,24 @@ export const PaymentPage = () => {
         }
         if (paymentMethod === 'card') {
             const digits = card.number.replace(/\D/g, '');
-            if (digits.length < 15)
-                return 'Enter a valid card number.';
+            const brand = detectCardBrand(digits);
+            const expectedLength = brand === 'Amex' ? 15 : 16;
+            if (digits.length !== expectedLength) {
+                return brand === 'Amex'
+                    ? 'Amex card numbers are 15 digits.'
+                    : 'Enter a valid card number.';
+            }
+            if (!passesLuhn(digits)) {
+                return 'That card number failed validation. Please re-check it.';
+            }
             if (!card.name.trim())
                 return 'Enter the name printed on the card.';
             if (!isExpiryValid(card.expiry))
                 return 'Enter a valid, unexpired date in MM/YY format.';
-            if (!/^\d{3,4}$/.test(card.cvc))
-                return 'Enter the 3 or 4 digit security code.';
+            const expectedCvc = detectCardBrand(digits) === 'Amex' ? 4 : 3;
+            if (new RegExp(`^\\d{${expectedCvc}}$`).test(card.cvc) !== true) {
+                return `The security code for this card is ${expectedCvc} digits.`;
+            }
         }
         if (paymentMethod === 'ewallet' && !walletId) {
             return 'Select a wallet to continue.';
@@ -143,10 +180,14 @@ export const PaymentPage = () => {
                 time: booking.time,
                 seats: booking.seats,
                 totalAmount: booking.totalAmount,
-                customerName: 'Marcus Levin',
-                customerEmail: 'marcus@example.com',
+                // Taken from the signed-in account instead of the hard-coded
+                // demo identity this page used to invent.
+                customerName: user?.fullName || booking.customerName || 'Guest',
+                customerEmail: user?.email || booking.customerEmail || '',
                 createdAt: new Date().toISOString(),
-                qrCodeData: `https://cinepass.my/verify/${booking.orderId}`,
+                // Prefer the verification token issued by the booking API; only
+                // synthesise one when the booking did not carry one.
+                qrCodeData: booking.qrCodeData || `https://tickettotal.in/verify/${booking.orderId}`,
                 status: 'CONFIRMED',
                 title: booking.title,
                 posterImage: booking.posterImage,
@@ -154,7 +195,12 @@ export const PaymentPage = () => {
             setPaidBooking(record);
         }
         catch (err) {
-            setErrorMessage(err instanceof Error ? err.message : 'Payment could not be completed. Please try again.');
+            const msg = err instanceof SyntaxError
+                ? 'Cannot reach the server. Make sure the backend is running on port 5000.'
+                : err instanceof Error
+                    ? err.message
+                    : 'Payment could not be completed. Please try again.';
+            setErrorMessage(msg);
         }
         finally {
             setIsProcessing(false);
@@ -164,16 +210,16 @@ export const PaymentPage = () => {
         if (!paidBooking)
             return;
         const lines = [
-            'CINEPASS E-TICKET',
+            `${BRAND.toUpperCase()} E-TICKET`,
             '===================',
             `Order ID: ${paidBooking.orderId}`,
             `Title: ${paidBooking.title || 'Cinema Ticket'}`,
             `Venue: ${paidBooking.theatreName}`,
             `Date & Time: ${paidBooking.date} @ ${paidBooking.time}`,
             `Seats: ${paidBooking.seats.join(', ')}`,
-            `Amount Paid: RM ${paidBooking.totalAmount.toFixed(2)}`,
-            `Convenience Fee: RM ${convenienceFee.toFixed(2)}`,
-            `Total Paid: RM ${totalPayable.toFixed(2)}`,
+            `Amount Paid: ₹${paidBooking.totalAmount.toFixed(2)}`,
+            `Convenience Fee: ₹${convenienceFee.toFixed(2)}`,
+            `Total Paid: ₹${totalPayable.toFixed(2)}`,
             `Status: ${paidBooking.status}`,
             `Verification: ${paidBooking.qrCodeData}`,
         ];
@@ -182,8 +228,12 @@ export const PaymentPage = () => {
         const link = document.createElement('a');
         link.href = url;
         link.download = `${paidBooking.orderId}-ticket.txt`;
+        // Safari and some Chromium builds cancel the download if the object
+        // URL is revoked in the same tick as the click.
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
     /* Guard state: direct navigation without a reserved booking. */
     if (!booking) {
@@ -229,9 +279,9 @@ export const PaymentPage = () => {
                 { label: 'Showtime', value: paidBooking.time },
                 { label: 'Seats', value: paidBooking.seats.join(', '), accent: true },
                 { label: 'Payment Method', value: PAYMENT_METHODS.find((m) => m.id === paymentMethod)?.label || 'Card' },
-                { label: 'Ticket Subtotal', value: `RM ${paidBooking.totalAmount.toFixed(2)}` },
-                { label: 'Convenience Fee', value: `RM ${convenienceFee.toFixed(2)}` },
-                { label: 'Total Paid', value: `RM ${totalPayable.toFixed(2)}`, accent: true },
+                { label: 'Ticket Subtotal', value: `₹${paidBooking.totalAmount.toFixed(2)}` },
+                { label: 'Convenience Fee', value: `₹${convenienceFee.toFixed(2)}` },
+                { label: 'Total Paid', value: `₹${totalPayable.toFixed(2)}`, accent: true },
             ].map((row) => (<div key={row.label} className="flex items-center justify-between gap-4 px-4 py-3">
                   <span className="text-xs text-neutral-500">{row.label}</span>
                   <span className={`text-xs text-right ${row.accent ? 'text-[#f5a623] font-bold' : 'text-white font-medium'} ${row.mono ? 'font-mono' : ''}`}>
@@ -408,7 +458,7 @@ export const PaymentPage = () => {
                   Select Wallet
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {['Touch n Go eWallet', 'GrabPay', 'Boost'].map((wallet) => (<button key={wallet} type="button" onClick={() => setWalletId(wallet)} className={`py-3 px-4 rounded-xl border text-xs font-medium transition-all cursor-pointer ${walletId === wallet
+                  {['Google Pay', 'PhonePe', 'Paytm', 'Amazon Pay'].map((wallet) => (<button key={wallet} type="button" onClick={() => setWalletId(wallet)} className={`py-3 px-4 rounded-xl border text-xs font-medium transition-all cursor-pointer ${walletId === wallet
                     ? 'border-[#f5a623] bg-[#f5a623]/15 text-white'
                     : 'border-white/10 bg-white/5 text-neutral-400 hover:border-white/25'}`}>
                       {wallet}
@@ -422,7 +472,7 @@ export const PaymentPage = () => {
                   Select Bank
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {['Maybank', 'CIMB', 'Public Bank', 'RHB', 'Bank Islam', 'HSBC'].map((bank) => (<button key={bank} type="button" onClick={() => setBankId(bank)} className={`py-3 px-4 rounded-xl border text-xs font-medium transition-all cursor-pointer ${bankId === bank
+                  {['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra', 'Punjab National Bank'].map((bank) => (<button key={bank} type="button" onClick={() => setBankId(bank)} className={`py-3 px-4 rounded-xl border text-xs font-medium transition-all cursor-pointer ${bankId === bank
                     ? 'border-[#f5a623] bg-[#f5a623]/15 text-white'
                     : 'border-white/10 bg-white/5 text-neutral-400 hover:border-white/25'}`}>
                       {bank}
@@ -474,22 +524,24 @@ export const PaymentPage = () => {
           </div>
 
           <div className="border-t border-white/10 pt-4 space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-neutral-400">
-                Tickets ({booking.seats.length} x RM {(booking.totalAmount / booking.seats.length).toFixed(2)})
-              </span>
-              <span className="text-white font-medium">RM {booking.totalAmount.toFixed(2)}</span>
-            </div>
+            {/* seats.length can legitimately be 0 on a half-built reservation;
+                guard the per-seat price so the summary never renders "NaN". */}
+            {seatCount > 0 && (<div className="flex items-center justify-between">
+                <span className="text-neutral-400">
+                  Tickets ({seatCount} x ₹{(booking.totalAmount / seatCount).toFixed(2)})
+                </span>
+                <span className="text-white font-medium">₹{booking.totalAmount.toFixed(2)}</span>
+              </div>)}
             {convenienceFee > 0 && (<div className="flex items-center justify-between">
                 <span className="text-neutral-400">Convenience fee</span>
-                <span className="text-white font-medium">RM {convenienceFee.toFixed(2)}</span>
+                <span className="text-white font-medium">₹{convenienceFee.toFixed(2)}</span>
               </div>)}
             <div className="flex items-center justify-between pt-2 border-t border-white/10">
               <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
                 Total Payable
               </span>
               <span className="text-xl font-heading font-black text-[#f5a623]">
-                RM {totalPayable.toFixed(2)}
+                ₹{totalPayable.toFixed(2)}
               </span>
             </div>
           </div>
@@ -500,12 +552,12 @@ export const PaymentPage = () => {
                 <span>Processing Payment...</span>
               </>) : (<>
                 <Lock className="w-4 h-4"/>
-                <span>Pay RM {totalPayable.toFixed(2)}</span>
+                <span>Pay ₹{totalPayable.toFixed(2)}</span>
               </>)}
           </button>
 
           <p className="text-[10px] text-neutral-600 text-center leading-relaxed">
-            By continuing you agree to CinePass terms of service and refund policy.
+            By continuing you agree to {BRAND} terms of service and refund policy.
           </p>
         </div>
       </div>
