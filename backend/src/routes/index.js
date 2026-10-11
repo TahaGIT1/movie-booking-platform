@@ -10,6 +10,7 @@ import bookingRoutes from '../modules/bookings/bookings.routes.js';
 import staffRoutes from '../modules/staff/staff.routes.js';
 import seatRoutes from '../modules/seats/seats.routes.js';
 import adminAnalyticsRoutes from '../modules/admin/admin.analytics.routes.js';
+import notificationRoutes from '../modules/notifications/notifications.routes.js';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.use('/auth', authRoutes);
 router.use('/admin/movies', adminMovieRoutes);
 router.use('/admin/theatres', adminTheatreRoutes);
 router.use('/movies', movieRoutes);
+router.use('/notifications', notificationRoutes);
 
 // Manager portal scoped routes
 router.use('/manager/theatre', theatreRoutes);

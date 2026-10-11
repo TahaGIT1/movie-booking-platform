@@ -144,7 +144,22 @@ router.get('/my/analytics', authenticate, requirePermission(['VIEW_REPORTS', 'MA
 // Public customer routes
 router.get('/', async (req, res, next) => {
   try {
-    const theatres = await prisma.theatre.findMany({ where: { status: 'ACTIVE' } });
+    const { city } = req.query;
+    const where = { status: { in: ['APPROVED', 'ACTIVE'] } };
+    if (city && city !== 'All Cities' && city !== 'All') {
+      where.city = { equals: city, mode: 'insensitive' };
+    }
+    const theatres = await prisma.theatre.findMany({
+      where,
+      include: {
+        screens: true,
+        shows: {
+          where: { isCancelled: false, startTime: { gte: new Date() } },
+          include: { movie: true }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
     res.json({ success: true, data: theatres });
   } catch (err) { next(err); }
 });

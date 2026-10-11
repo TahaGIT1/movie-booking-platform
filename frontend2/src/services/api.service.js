@@ -49,12 +49,32 @@ export const api = {
     return data;
   },
 
+  logout: async () => {
+    try {
+      const res = await fetch(API_BASE_URL + '/auth/logout', {
+        method: 'POST',
+        headers: getHeaders(true)
+      });
+      return await res.json().catch(() => ({}));
+    } catch (e) {
+      console.warn('Backend logout failed:', e);
+      return { success: false };
+    }
+  },
+
   // Movies
   getMovies: async () => {
     const res = await fetch(API_BASE_URL + '/movies');
     if (!res.ok) return [];
     const data = await res.json();
     return data.data || data;
+  },
+
+  searchMovies: async (q) => {
+    const res = await fetch(`${API_BASE_URL}/movies/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!res.ok) return [];
+    return data.data || [];
   },
 
   getAdminMovies: async () => {
@@ -108,8 +128,13 @@ export const api = {
       ? `${API_BASE_URL}/admin/theatres?status=${encodeURIComponent(status)}`
       : `${API_BASE_URL}/admin/theatres`;
     const res = await fetch(url, { headers: getHeaders() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to fetch theatres');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error('Authentication required (401). Please sign in as Super Admin.');
+      }
+      throw new Error(data.message || data.error?.message || 'Failed to fetch theatres');
+    }
     return data.data || [];
   },
 
@@ -119,8 +144,11 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ status })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to approve theatre');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Authentication required (401). Please sign in as Super Admin.');
+      throw new Error(data.message || data.error?.message || 'Failed to approve theatre');
+    }
     return data;
   },
 
@@ -130,8 +158,29 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ reason })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to reject theatre');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Authentication required (401). Please sign in as Super Admin.');
+      throw new Error(data.message || data.error?.message || 'Failed to reject theatre');
+    }
+    return data;
+  },
+
+  deleteAdminTheatre: async (theatreId) => {
+    const res = await fetch(`${API_BASE_URL}/admin/theatres/${theatreId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error('Authentication required (401): Super Admin session missing or expired. Please sign in as Super Admin.');
+      }
+      if (res.status === 403) {
+        throw new Error('Permission denied (403): Only Super Admins can delete theatres.');
+      }
+      throw new Error(data.message || data.error?.message || 'Failed to delete theatre');
+    }
     return data;
   },
 
@@ -362,5 +411,236 @@ export const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'Ticket validation failed');
     return data;
+  },
+
+  // Customer Facing Services
+  getMovieById: async (movieId) => {
+    const res = await fetch(`${API_BASE_URL}/movies/${movieId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch movie');
+    return data.data || data;
+  },
+
+  getPublicShows: async ({ movieId, city, date } = {}) => {
+    const query = new URLSearchParams();
+    if (movieId) query.append('movieId', movieId);
+    if (city) query.append('city', city);
+    if (date) query.append('date', date);
+
+    const res = await fetch(`${API_BASE_URL}/shows/public?${query.toString()}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch shows');
+    return data.data || [];
+  },
+
+  getShowById: async (showId) => {
+    const res = await fetch(`${API_BASE_URL}/shows/${showId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch show details');
+    return data.data;
+  },
+
+  getShowSeats: async (showId) => {
+    const res = await fetch(`${API_BASE_URL}/shows/${showId}/seats`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to load seats');
+    return data.data || [];
+  },
+
+  lockSeats: async (showId, seatIds) => {
+    const res = await fetch(`${API_BASE_URL}/shows/${showId}/seats/lock`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ seatIds })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const err = new Error(data.error?.message || data.message || 'Failed to lock seats');
+      err.code = data.error?.code;
+      err.details = data.error?.details;
+      throw err;
+    }
+    return data;
+  },
+
+  releaseSeats: async (showId, seatIds) => {
+    const res = await fetch(`${API_BASE_URL}/shows/${showId}/seats/release`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ seatIds })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to release seats');
+    return data;
+  },
+
+  releaseAllHolds: async () => {
+    const res = await fetch(`${API_BASE_URL}/shows/release-all-holds`, {
+      method: 'POST',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to release all holds');
+    return data;
+  },
+
+  getMyActiveHold: async () => {
+    const res = await fetch(`${API_BASE_URL}/shows/my-active-hold`, {
+      headers: getHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to check active hold');
+    return data.data;
+  },
+
+  initiateBooking: async (showId, seatIds) => {
+    const res = await fetch(`${API_BASE_URL}/bookings/initiate`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ showId, seatIds })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to initiate booking');
+    return data.data;
+  },
+
+  mockPayment: async (bookingId, status = 'SUCCESS') => {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/mock-payment`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ status })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Payment simulation failed');
+    return data;
+  },
+
+  getBookingById: async (bookingId) => {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}`, { headers: getHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch booking');
+    return data.data;
+  },
+
+  getMyBookings: async () => {
+    const res = await fetch(`${API_BASE_URL}/bookings/my`, { headers: getHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch your bookings');
+    return data.data || [];
+  },
+
+  cancelBooking: async (bookingId) => {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel`, {
+      method: 'POST',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to cancel booking');
+    return data;
+  },
+
+  getUserProfile: async () => {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, { headers: getHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch user profile');
+    return data.data;
+  },
+
+  updateUserProfile: async (profileData) => {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify(profileData)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to update user profile');
+    return data.data;
+  },
+
+  getPublicTheatres: async (city) => {
+    const url = city && city !== 'All Cities' && city !== 'All'
+      ? `${API_BASE_URL}/theatres?city=${encodeURIComponent(city)}`
+      : `${API_BASE_URL}/theatres`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch theatres');
+    return data.data || [];
+  },
+
+  getNotifications: async () => {
+    const res = await fetch(`${API_BASE_URL}/notifications`, { headers: getHeaders() });
+    const data = await res.json();
+    if (!res.ok) return { data: [], unreadCount: 0 };
+    return data;
+  },
+
+  markNotificationRead: async (notificationId) => {
+    const res = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: getHeaders()
+    });
+    return await res.json();
+  },
+
+  markAllNotificationsRead: async () => {
+    const res = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    return await res.json();
+  },
+
+  // Movie Reviews (Feature 12)
+  getMovieReviews: async (movieId) => {
+    const res = await fetch(`${API_BASE_URL}/movies/${movieId}/reviews`);
+    const data = await res.json();
+    return data;
+  },
+
+  submitMovieReview: async (movieId, reviewData) => {
+    const res = await fetch(`${API_BASE_URL}/movies/${movieId}/reviews`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(reviewData)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to submit review');
+    return data;
+  },
+
+  deleteMovieReview: async (movieId) => {
+    const res = await fetch(`${API_BASE_URL}/movies/${movieId}/reviews`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return await res.json();
+  },
+
+  // Watchlist (Feature 13)
+  getWatchlistStatus: async (movieId) => {
+    const res = await fetch(`${API_BASE_URL}/movies/${movieId}/watchlist`, {
+      headers: getHeaders()
+    });
+    const data = await res.json();
+    return data;
+  },
+
+  toggleWatchlist: async (movieId) => {
+    const res = await fetch(`${API_BASE_URL}/movies/${movieId}/watchlist`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to update watchlist');
+    return data;
+  },
+
+  getMyWatchlist: async () => {
+    const res = await fetch(`${API_BASE_URL}/movies/watchlist/my`, {
+      headers: getHeaders()
+    });
+    const data = await res.json();
+    return data;
   }
 };
+

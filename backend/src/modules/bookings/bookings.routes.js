@@ -182,6 +182,18 @@ router.post('/:id/mock-payment', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOK
           where: { id: bookingId },
           data: { status: 'CONFIRMED' }
         });
+
+        // Create in-app notification for the customer
+        await tx.notification.create({
+          data: {
+            userId,
+            type: 'BOOKING_CONFIRMED',
+            title: 'Tickets Confirmed!',
+            body: `Your booking (${booking.bookingReference}) has been confirmed successfully.`,
+            relatedEntity: 'Booking',
+            relatedId: bookingId
+          }
+        });
       });
 
       // Broadcast updates
@@ -242,6 +254,26 @@ router.get('/my', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/:id', async (req, res, next) => {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.id },
+      include: {
+        show: { include: { movie: true, screen: true, theatre: true } },
+        seats: { include: { seat: true } },
+        payments: true
+      }
+    });
+
+    if (!booking) throw new AppError(404, 'Booking not found');
+    if (req.user.role === 'CUSTOMER' && booking.userId !== req.user.id) {
+      throw new AppError(403, 'Unauthorized access to this booking');
+    }
+
+    res.json({ success: true, data: booking });
+  } catch (err) { next(err); }
+});
+
 router.post('/:id/cancel', async (req, res, next) => {
   try {
     const bookingId = req.params.id;
@@ -280,6 +312,18 @@ router.post('/:id/cancel', async (req, res, next) => {
       await tx.booking.update({
         where: { id: bookingId },
         data: { status: 'CANCELLED' }
+      });
+
+      // Create cancellation notification
+      await tx.notification.create({
+        data: {
+          userId,
+          type: 'BOOKING_CANCELLED',
+          title: 'Booking Cancelled',
+          body: `Your booking (${booking.bookingReference}) has been cancelled and refund initiated.`,
+          relatedEntity: 'Booking',
+          relatedId: bookingId
+        }
       });
     });
 

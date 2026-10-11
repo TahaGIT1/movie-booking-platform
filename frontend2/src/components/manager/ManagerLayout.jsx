@@ -211,9 +211,52 @@ export const ManagerLayout = () => {
           </div>
         )}
 
+        {!theatre && !loading && (
+          <div className="bg-red-500/10 border-b border-red-500/20 px-6 py-3 flex flex-col sm:flex-row items-center justify-between text-xs text-red-300 gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert size={16} className="text-red-400 shrink-0" />
+              <span>
+                <strong>Cinema Venue Removed:</strong> The theatre previously linked to this account was deleted by an administrator.
+              </span>
+            </div>
+            <button
+              onClick={logout}
+              className="px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 font-bold text-xs transition cursor-pointer"
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
+
         {/* Scrollable Viewport */}
         <main className="flex-1 overflow-y-auto p-8 relative">
-          <Outlet context={{ theatre, refreshTheatre: fetchTheatre }} />
+          {!theatre && !loading ? (
+            <div className="max-w-md mx-auto my-12 bg-neutral-900/60 border border-red-500/20 rounded-3xl p-8 text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
+                <Building2 size={28} />
+              </div>
+              <h2 className="text-xl font-bold text-white">No Cinema Assigned</h2>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                The cinema venue previously managed by this account has been cleared and removed by platform administrators.
+              </p>
+              <div className="pt-2 flex justify-center gap-3">
+                <Link
+                  to="/"
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition"
+                >
+                  Return to Home
+                </Link>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Outlet context={{ theatre, refreshTheatre: fetchTheatre }} />
+          )}
         </main>
       </div>
     </div>

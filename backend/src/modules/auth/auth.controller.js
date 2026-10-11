@@ -1,4 +1,6 @@
 import * as authService from './auth.service.js';
+import { prisma } from '../../config/prisma.js';
+import { io } from '../../socket.js';
 
 export const register = async (req, res, next) => {
   try {
@@ -31,7 +33,70 @@ export const getMe = (req, res) => {
   res.json({ success: true, data: req.user });
 };
 
-export const logout = (req, res) => {
-  // Ideally revoke refresh token in DB
-  res.json({ success: true, message: 'Logged out' });
+export const updateMe = async (req, res, next) => {
+  try {
+    const { fullName, mobileNumber, preferences } = req.body;
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        ...(fullName && { fullName }),
+        ...(mobileNumber !== undefined && { mobileNumber }),
+        ...(preferences && { preferences })
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        mobileNumber: true,
+        role: true,
+        preferences: true,
+        theatreId: true
+      }
+    });
+    res.json({ success: true, data: updated, message: 'Profile updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (userId) {
+      // Automatically release any seats currently on hold by this user
+      const activeHolds = await prisma.showSeatStatus.findMany({
+        where: {
+          lockedByUserId: userId,
+          lockExpiresAt: { gt: new Date() }
+        },
+        select: { id: true, showId: true, seatId: true }
+      });
+
+      if (activeHolds.length > 0) {
+        await prisma.showSeatStatus.updateMany({
+          where: {
+            id: { in: activeHolds.map((h) => h.id) }
+          },
+          data: {
+            lockedByUserId: null,
+            lockExpiresAt: null
+          }
+        });
+
+        // Notify real-time listeners for all affected shows
+        for (const hold of activeHolds) {
+          io.to(`show:${hold.showId}`).emit('seat:released', { seatId: hold.seatId });
+        }
+      }
+
+      // Revoke user refresh tokens
+      await prisma.refreshToken.deleteMany({
+        where: { userId }
+      });
+    }
+
+    res.json({ success: true, message: 'Logged out and all active seat holds released' });
+  } catch (error) {
+    next(error);
+  }
 };
