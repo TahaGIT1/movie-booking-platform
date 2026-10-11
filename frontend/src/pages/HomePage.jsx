@@ -54,7 +54,7 @@ export const HomePage = () => {
       activeOption: 'Now Showing',
       secondaryOption: 'Coming Soon',
     },
-    items: heroMovies.slice(0, 4),
+    items: heroMovies.slice(0, 8),
   };
 
   const gridItems = activeTab === 'upcoming'

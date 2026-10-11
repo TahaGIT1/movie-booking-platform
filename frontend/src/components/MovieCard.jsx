@@ -1,6 +1,6 @@
-import React from 'react';
-export const MovieCard = ({ item, isSelected = false, onClick, headerBadge, scheduleMarker, }) => {
-    return (<div className="flex flex-col items-start select-none">
+import React, { forwardRef } from 'react';
+export const MovieCard = forwardRef(({ item, isSelected = false, onClick, headerBadge, scheduleMarker, }, ref) => {
+    return (<div ref={ref} className="flex flex-col items-start select-none shrink-0 transition-transform">
       {/* Header bar above card: number + optional schedule marker / category badge */}
       <div className="w-full flex items-center justify-between h-7 px-1 mb-2">
         <div className="flex items-center gap-2">
@@ -48,4 +48,4 @@ export const MovieCard = ({ item, isSelected = false, onClick, headerBadge, sche
         <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors pointer-events-none"/>
       </div>
     </div>);
-};
+});

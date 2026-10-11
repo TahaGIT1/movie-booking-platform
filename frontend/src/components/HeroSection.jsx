@@ -117,7 +117,7 @@ export const HeroSection = ({ config, onOpenBooking, onStatusCategoryChange, cur
           </div>
 
           {/* RIGHT COLUMN: Interactive Movie/Event/Stream Carousel */}
-          <div className="lg:col-span-6 xl:col-span-6 flex flex-col items-center lg:items-end justify-center w-full">
+          <div className="lg:col-span-6 xl:col-span-6 flex flex-col items-center lg:items-end justify-center w-full min-w-0">
             <Carousel items={config.items} selectedIndex={selectedIndex} onSelect={setSelectedIndex} headerBadge={currentItem.heroBadge || (config.pageType === 'movies' ? 'BLOCKBUSTER' : 'Watch Now')} scheduleMarker={config.pageType === 'movies'
             ? 'Tomorrow'
             : config.pageType === 'events'
