@@ -6,6 +6,7 @@ export const registerSchema = z.object({
   mobileNumber: z.string().optional(),
   password: z.string().min(6),
   role: z.enum(['CUSTOMER', 'THEATRE_MANAGER', 'THEATRE_STAFF', 'SUPER_ADMIN']).default('CUSTOMER'),
+  otp: z.string().optional(),
   theatreName: z.string().optional(),
   legalEntityName: z.string().optional(),
   gstNumber: z.string().optional(),
@@ -37,4 +38,24 @@ export const loginSchema = z.object({
 
 export const refreshSchema = z.object({
   refreshToken: z.string()
+});
+
+export const sendSignupOtpSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().optional()
+});
+
+export const verifySignupOtpSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().min(4).max(10)
+});
+
+export const sendForgotPasswordOtpSchema = z.object({
+  email: z.string().email()
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().min(4).max(10),
+  newPassword: z.string().min(6)
 });
