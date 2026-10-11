@@ -11,6 +11,42 @@ export const register = async (req, res, next) => {
   }
 };
 
+export const sendSignupOtp = async (req, res, next) => {
+  try {
+    const result = await authService.requestSignupOtp(req.body);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifySignupOtp = async (req, res, next) => {
+  try {
+    const result = await authService.verifySignupOtp(req.body);
+    res.json({ success: true, message: 'OTP verified successfully', ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendForgotPasswordOtp = async (req, res, next) => {
+  try {
+    const result = await authService.requestForgotPasswordOtp(req.body);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const result = await authService.resetPasswordWithOtp(req.body);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const login = async (req, res, next) => {
   try {
     const result = await authService.login(req.body);

@@ -49,6 +49,59 @@ export const api = {
     return data;
   },
 
+  // OTP Verification & Password Reset
+  sendSignupOtp: async ({ email, fullName }) => {
+    const res = await fetch(API_BASE_URL + '/auth/otp/send-signup-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, fullName }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error?.message || data.message || 'Failed to send verification code');
+    }
+    return data;
+  },
+
+  verifySignupOtp: async ({ email, otp }) => {
+    const res = await fetch(API_BASE_URL + '/auth/otp/verify-signup-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error?.message || data.message || 'Invalid or expired OTP');
+    }
+    return data;
+  },
+
+  sendForgotPasswordOtp: async ({ email }) => {
+    const res = await fetch(API_BASE_URL + '/auth/otp/send-forgot-password-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error?.message || data.message || 'Failed to send password reset code');
+    }
+    return data;
+  },
+
+  resetPassword: async ({ email, otp, newPassword }) => {
+    const res = await fetch(API_BASE_URL + '/auth/otp/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, newPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error?.message || data.message || 'Failed to reset password');
+    }
+    return data;
+  },
+
   logout: async () => {
     try {
       const res = await fetch(API_BASE_URL + '/auth/logout', {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -11,9 +11,12 @@ import {
   AlertCircle, 
   Building2, 
   Ticket, 
-  ArrowRight,
-  Sparkles,
-  ArrowLeft
+  ArrowRight, 
+  Sparkles, 
+  ArrowLeft,
+  KeyRound,
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 import { api } from '../../services/api.service';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,12 +32,29 @@ export const CustomerSignup = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // OTP states
+  const [step, setStep] = useState('form'); // 'form' | 'otp'
+  const [otp, setOtp] = useState('');
+  const [countdown, setCountdown] = useState(0);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  const handleSubmit = async (e) => {
+  // Countdown timer for resend OTP
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
+  // Step 1: Send Signup OTP to Email
+  const handleRequestOtp = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
 
     if (!fullName.trim()) {
       setError('Please enter your full name.');
@@ -56,12 +76,38 @@ export const CustomerSignup = () => {
     setLoading(true);
 
     try {
+      const res = await api.sendSignupOtp({ email, fullName });
+      setSuccessMsg(res.message || `Verification code sent to ${email}`);
+      setStep('otp');
+      setCountdown(45);
+    } catch (err) {
+      setError(err.message || 'Failed to send verification code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Verify OTP and Complete Registration
+  const handleVerifyAndSignup = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    const cleanOtp = otp.trim();
+    if (!cleanOtp || cleanOtp.length < 6) {
+      setError('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
       const result = await api.register({
         fullName,
         email,
         mobileNumber: mobileNumber || undefined,
         password,
-        role: 'CUSTOMER'
+        role: 'CUSTOMER',
+        otp: cleanOtp
       });
 
       if (result.success) {
@@ -71,7 +117,25 @@ export const CustomerSignup = () => {
         throw new Error(result.message || 'Registration failed');
       }
     } catch (err) {
-      setError(err.message || 'Signup failed. Please try again.');
+      setError(err.message || 'Verification failed. Please check the code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resend OTP handler
+  const handleResendOtp = async () => {
+    if (countdown > 0 || loading) return;
+    setError('');
+    setSuccessMsg('');
+    setLoading(true);
+
+    try {
+      await api.sendSignupOtp({ email, fullName });
+      setSuccessMsg(`A fresh verification code was sent to ${email}`);
+      setCountdown(45);
+    } catch (err) {
+      setError(err.message || 'Failed to resend code');
     } finally {
       setLoading(false);
     }
@@ -128,141 +192,224 @@ export const CustomerSignup = () => {
             <Link to="/" className="text-3xl font-black text-white tracking-tight">
               CineVerse<span className="text-yellow-500">.</span>
             </Link>
-            <h1 className="text-xl font-bold text-white mt-3">Create Customer Account</h1>
+            <h1 className="text-xl font-bold text-white mt-3">
+              {step === 'form' ? 'Create Customer Account' : 'Verify Email Address'}
+            </h1>
             <p className="text-neutral-400 text-xs mt-1">
-              Book movie tickets, select favorite seats, and access digital passes.
+              {step === 'form' 
+                ? 'Book movie tickets, select favorite seats, and access digital passes.'
+                : 'Enter the 6-digit one-time code sent to your email to activate your account.'}
             </p>
           </div>
 
           {error && (
-            <div className="mb-5 bg-red-500/15 border border-red-500/40 text-red-200 px-4 py-3 rounded-xl flex items-center gap-2.5 text-xs font-medium">
+            <div className="mb-5 bg-red-500/15 border border-red-500/40 text-red-200 px-4 py-3 rounded-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in">
               <AlertCircle size={16} className="text-red-400 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Full Name */}
-            <div>
-              <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
-                Full Name
-              </label>
-              <div className="relative">
-                <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  placeholder="John Doe"
-                  className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
-                />
-              </div>
+          {successMsg && (
+            <div className="mb-5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 px-4 py-3 rounded-xl flex items-center gap-2.5 text-xs font-medium animate-in fade-in">
+              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+              <span>{successMsg}</span>
             </div>
+          )}
 
-            {/* Email */}
-            <div>
-              <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
-                />
+          {step === 'form' ? (
+            <form onSubmit={handleRequestOtp} className="space-y-4">
+              {/* Full Name */}
+              <div>
+                <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Mobile Number */}
-            <div>
-              <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
-                Mobile Number <span className="text-neutral-500 font-normal">(optional)</span>
-              </label>
-              <div className="relative">
-                <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type="tel"
-                  value={mobileNumber}
-                  onChange={e => setMobileNumber(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
-                />
+              {/* Email */}
+              <div>
+                <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Password */}
-            <div>
-              <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
-                />
+              {/* Mobile Number */}
+              <div>
+                <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
+                  Mobile Number <span className="text-neutral-500 font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <input
+                    type="tel"
+                    value={mobileNumber}
+                    onChange={e => setMobileNumber(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-2 bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold py-3.5 rounded-xl transition hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    <span>Sending Verification Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <Ticket size={18} />
+                    <span>Continue & Verify Email</span>
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            /* OTP Verification Step */
+            <form onSubmit={handleVerifyAndSignup} className="space-y-4 animate-in fade-in">
+              <div className="text-center p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl">
+                <ShieldCheck size={28} className="text-yellow-400 mx-auto mb-2" />
+                <p className="text-xs text-neutral-300">
+                  We sent a 6-digit verification code to:
+                </p>
+                <p className="text-sm font-bold text-white mt-0.5">{email}</p>
+              </div>
+
+              <div>
+                <label className="text-neutral-400 text-xs uppercase tracking-wider font-bold mb-1.5 block text-center">
+                  6-Digit Verification Code
+                </label>
+                <div className="relative">
+                  <KeyRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-yellow-500" />
+                  <input
+                    type="text"
+                    maxLength={6}
+                    autoFocus
+                    autoComplete="one-time-code"
+                    className="w-full bg-black/70 border border-yellow-500/40 text-center tracking-[8px] font-mono font-bold text-2xl text-yellow-400 pl-10 pr-4 py-3.5 rounded-xl outline-none focus:border-yellow-400 focus:shadow-[0_0_15px_rgba(234,179,8,0.2)] transition"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                    required
+                    placeholder="••••••"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs px-1">
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition"
+                  onClick={() => {
+                    setStep('form');
+                    setError('');
+                  }}
+                  className="text-neutral-400 hover:text-white flex items-center gap-1 transition"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <ArrowLeft size={13} />
+                  <span>Edit Details</span>
                 </button>
-              </div>
-            </div>
 
-            {/* Confirm Password */}
-            <div>
-              <label className="text-neutral-300 text-xs font-bold uppercase tracking-wider block mb-1.5">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-black/60 border border-white/10 focus:border-yellow-500 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-neutral-500 outline-none transition"
-                />
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition"
+                  disabled={countdown > 0 || loading}
+                  onClick={handleResendOtp}
+                  className="text-yellow-500 hover:text-yellow-400 disabled:text-neutral-500 font-semibold flex items-center gap-1 transition cursor-pointer"
                 >
-                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                  <span>{countdown > 0 ? `Resend in ${countdown}s` : 'Resend Code'}</span>
                 </button>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold py-3.5 rounded-xl transition hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  <span>Creating Account...</span>
-                </>
-              ) : (
-                <>
-                  <Ticket size={18} />
-                  <span>Create Customer Account</span>
-                </>
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading || otp.length < 6}
+                className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-extrabold py-3.5 rounded-xl transition hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] mt-2 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    <span>Verifying Code...</span>
+                  </>
+                ) : (
+                  <span>Verify & Create Account</span>
+                )}
+              </button>
+            </form>
+          )}
 
           {/* Login switch */}
           <div className="mt-6 text-center text-xs text-neutral-400">
@@ -273,7 +420,7 @@ export const CustomerSignup = () => {
                 navigate('/');
                 openAuthModal('login');
               }}
-              className="text-yellow-500 font-bold hover:underline"
+              className="text-yellow-500 font-bold hover:underline cursor-pointer"
             >
               Sign In
             </button>
