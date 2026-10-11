@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Building2, ClipboardCheck, ArrowRight, Clock } from 'lucide-react';
 import { api } from '../../services/api.service';
+import { API_BASE_URL } from '../../config/constants';
 
 export const DashboardOverview = () => {
   const [stats, setStats] = useState({ movies: 0, theatres: 0, pendingRequests: 0 });
@@ -11,8 +12,8 @@ export const DashboardOverview = () => {
     const fetchStats = async () => {
       try {
         const [moviesRes, theatresRes, adminTheatres] = await Promise.all([
-          fetch(import.meta.env.VITE_API_BASE_URL + '/movies').then(res => res.json()).catch(() => ({ data: [] })),
-          fetch(import.meta.env.VITE_API_BASE_URL + '/theatres').then(res => res.json()).catch(() => ({ data: [] })),
+          fetch(API_BASE_URL + '/movies').then(res => res.json()).catch(() => ({ data: [] })),
+          fetch(API_BASE_URL + '/theatres').then(res => res.json()).catch(() => ({ data: [] })),
           api.getAdminTheatres().catch(() => [])
         ]);
 

@@ -1,5 +1,3 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+export const API_BASE_URL = rawBaseUrl.trim().replace(/\/+$/, '');
 
-if (!API_BASE_URL) {
-  throw new Error("VITE_API_BASE_URL is not defined in the environment variables!");
-}

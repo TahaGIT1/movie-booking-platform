@@ -23,6 +23,7 @@ import {
   X
 } from 'lucide-react';
 import { api } from '../../services/api.service';
+import { API_BASE_URL } from '../../config/constants';
 
 const REASON_PRESETS = [
   "Invalid or unverifiable GSTIN / Tax ID",
@@ -62,7 +63,7 @@ export const TheatreRequests = () => {
       console.error('Failed to fetch theatres:', err);
       // Fallback: fetch from public route if token issue
       try {
-        const res = await fetch(import.meta.env.VITE_API_BASE_URL + '/theatres');
+        const res = await fetch(API_BASE_URL + '/theatres');
         const data = await res.json();
         setTheatres(data.data || []);
       } catch (e) {

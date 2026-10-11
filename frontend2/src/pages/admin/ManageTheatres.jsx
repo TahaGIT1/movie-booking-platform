@@ -23,6 +23,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { api } from '../../services/api.service';
+import { API_BASE_URL } from '../../config/constants';
 
 export const ManageTheatres = () => {
   const [theatres, setTheatres] = useState([]);
@@ -72,7 +73,7 @@ export const ManageTheatres = () => {
     } catch (err) {
       console.error('Failed to fetch admin theatres, fallback to public:', err);
       try {
-        const res = await fetch(import.meta.env.VITE_API_BASE_URL + '/theatres');
+        const res = await fetch(API_BASE_URL + '/theatres');
         const data = await res.json();
         setTheatres(data.data || []);
       } catch (e) {
@@ -88,7 +89,7 @@ export const ManageTheatres = () => {
     setCreateLoading(true);
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(import.meta.env.VITE_API_BASE_URL + '/admin/theatres', {
+      const res = await fetch(API_BASE_URL + '/admin/theatres', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json', 
