@@ -16,3 +16,6 @@ dist/
 
 # Neon project-link metadata
 /.neon
+
+# Local persistent state
+/src/data/local_users.json
