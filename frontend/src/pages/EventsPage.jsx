@@ -4,15 +4,18 @@ import { api } from '../services/api';
 import { BookingModal } from '../components/BookingModal';
 import { Star, Ticket } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useLocationContext } from '../contexts/LocationContext';
 
 export const EventsPage = () => {
+  const { selectedCity } = useLocationContext();
   const [bookingItem, setBookingItem] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    api.getEvents().then((data) => {
+    setLoading(true);
+    api.getEvents(selectedCity?.name).then((data) => {
       if (isMounted) {
         setEvents(Array.isArray(data) ? data : []);
         setLoading(false);
@@ -26,7 +29,7 @@ export const EventsPage = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [selectedCity]);
 
   const heroConfig = {
     pageType: 'events',

@@ -641,6 +641,52 @@ export const api = {
     });
     const data = await res.json();
     return data;
+  },
+
+  // Cities & Locations
+  getCities: async (params) => {
+    try {
+      const query = new URLSearchParams();
+      if (params?.search) query.set('search', params.search);
+      if (params?.popular) query.set('popular', 'true');
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/cities${qs}`);
+      if (res.ok) {
+        const body = await res.json();
+        return body;
+      }
+    } catch (e) {
+      console.warn('api.service getCities failed:', e);
+    }
+    return { success: false, data: [] };
+  },
+
+  getCityById: async (cityId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cities/${encodeURIComponent(cityId)}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('api.service getCityById failed:', e);
+    }
+    return { success: false, data: null };
+  },
+
+  getTheatres: async (city) => {
+    try {
+      const url = city && city !== 'All Cities' && city !== 'All'
+        ? `${API_BASE_URL}/theatres?city=${encodeURIComponent(city)}`
+        : `${API_BASE_URL}/theatres`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : (data.data || []);
+      }
+    } catch (e) {
+      console.warn('api.service getTheatres failed:', e);
+    }
+    return [];
   }
 };
 

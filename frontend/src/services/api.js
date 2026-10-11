@@ -205,11 +205,14 @@ export const DEFAULT_FALLBACK_MOVIES = [
 export const DEFAULT_FALLBACK_THEATRES = [
   {
     id: 'pavilion-elite-imax',
-    name: 'Dadi Cinema & IMAX Pavilion Elite',
-    location: 'Level 7, Pavilion Kuala Lumpur, Bukit Bintang',
+    name: 'IMAX Pavilion Elite KL',
+    location: 'Level 8, Pavilion Kuala Lumpur, Bukit Bintang',
+    addressLine: 'Level 8, Pavilion Kuala Lumpur, Bukit Bintang',
     city: 'Kuala Lumpur',
+    state: 'Wilayah Persekutuan',
     distance: '1.2 km away',
     features: ['IMAX with Laser', 'Star-Max Bed Lounge', 'Dolby Atmos', 'Gourmet Bar'],
+    amenities: ['IMAX Laser', 'Dolby Atmos', 'VIP Lounge', 'Recliner Luxury'],
     showtimes: [
       { format: 'IMAX Laser 2D', times: ['11:30 AM', '02:45 PM', '06:15 PM', '09:30 PM', '12:15 AM'], price: 38 },
       { format: 'Dolby Atmos', times: ['12:30 PM', '03:45 PM', '07:00 PM', '10:15 PM'], price: 26 },
@@ -220,9 +223,12 @@ export const DEFAULT_FALLBACK_THEATRES = [
     id: 'gsc-mid-valley',
     name: 'GSC Mid Valley Megamall',
     location: 'Level 3, Mid Valley Megamall, Lingkaran Syed Putra',
+    addressLine: 'Level 3, Mid Valley Megamall, Lingkaran Syed Putra',
     city: 'Kuala Lumpur',
+    state: 'Wilayah Persekutuan',
     distance: '4.8 km away',
     features: ['ScreenX 270°', '4DX Motion', 'Dolby Atmos', 'Premiere Class'],
+    amenities: ['ScreenX 270°', '4DX Motion', 'Dolby Atmos', 'Premiere Class'],
     showtimes: [
       { format: 'ScreenX 270°', times: ['01:15 PM', '04:30 PM', '07:45 PM', '10:45 PM'], price: 32 },
       { format: '4DX Motion & Effects', times: ['12:00 PM', '03:15 PM', '06:30 PM', '09:45 PM'], price: 35 },
@@ -233,13 +239,121 @@ export const DEFAULT_FALLBACK_THEATRES = [
     id: 'tgv-sunway-pyramid',
     name: 'TGV Sunway Pyramid IMAX',
     location: 'F1.M1, Sunway Pyramid Shopping Mall, Bandar Sunway',
+    addressLine: 'F1.M1, Sunway Pyramid Shopping Mall, Bandar Sunway',
     city: 'Petaling Jaya',
+    state: 'Selangor',
     distance: '14.2 km away',
     features: ['IMAX 12-Track Sound', 'INDULGE Luxury Suites', 'Beanie Beanbag Hall'],
+    amenities: ['IMAX 12-Track Sound', 'INDULGE Luxury Suites', 'Beanie Beanbag Hall'],
     showtimes: [
       { format: 'IMAX 2D', times: ['11:00 AM', '02:15 PM', '05:30 PM', '08:45 PM'], price: 36 },
       { format: 'INDULGE Luxury', times: ['01:00 PM', '04:30 PM', '07:30 PM', '10:30 PM'], price: 75 },
       { format: 'Standard 2D', times: ['10:30 AM', '01:30 PM', '04:30 PM', '07:30 PM', '10:30 PM'], price: 20 },
+    ],
+  },
+  {
+    id: 'pvr-phoenix-mumbai',
+    name: 'PVR INOX Phoenix Palladium',
+    location: '462, Senapati Bapat Marg, Lower Parel',
+    addressLine: '462, Senapati Bapat Marg, Lower Parel',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    distance: '2.5 km away',
+    features: ['IMAX with Laser', 'Insignia Dining', 'Dolby Atmos', '4DX'],
+    amenities: ['IMAX with Laser', 'Insignia Dining', 'Dolby Atmos', '4DX'],
+    showtimes: [
+      { format: 'IMAX Laser 2D', times: ['10:45 AM', '02:00 PM', '05:30 PM', '09:00 PM'], price: 450 },
+      { format: 'Dolby Atmos', times: ['11:30 AM', '03:15 PM', '07:00 PM', '10:30 PM'], price: 320 },
+    ],
+  },
+  {
+    id: 'pvr-forum-bengaluru',
+    name: 'PVR Forum Mall Koramangala',
+    location: '21, Hosur Road, Koramangala',
+    addressLine: '21, Hosur Road, Koramangala',
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    distance: '3.1 km away',
+    features: ['Gold Class', 'Dolby 7.1 Surround', 'IMAX Laser', 'Recliner Seating'],
+    amenities: ['Gold Class', 'Dolby 7.1 Surround', 'IMAX Laser', 'Recliner Seating'],
+    showtimes: [
+      { format: 'IMAX Laser 2D', times: ['11:15 AM', '02:30 PM', '06:00 PM', '09:30 PM'], price: 420 },
+      { format: 'Gold Class', times: ['01:00 PM', '04:45 PM', '08:15 PM'], price: 650 },
+    ],
+  },
+  {
+    id: 'pvr-select-citywalk-delhi',
+    name: 'PVR Select CITYWALK Saket',
+    location: 'A-3, District Centre, Saket',
+    addressLine: 'A-3, District Centre, Saket',
+    city: 'Delhi-NCR',
+    state: 'National Capital Region',
+    distance: '4.0 km away',
+    features: ['IMAX Laser', 'Dolby Atmos', 'PVR Premiere', 'Director\'s Cut Lounge'],
+    amenities: ['IMAX Laser', 'Dolby Atmos', 'PVR Premiere', 'Director\'s Cut Lounge'],
+    showtimes: [
+      { format: 'IMAX Laser 2D', times: ['11:00 AM', '02:15 PM', '05:45 PM', '09:15 PM'], price: 440 },
+      { format: 'Director\'s Cut', times: ['12:30 PM', '04:00 PM', '07:30 PM', '11:00 PM'], price: 850 },
+    ],
+  },
+  {
+    id: 'shaw-theatres-singapore',
+    name: 'Shaw Theatres Jewel & IMAX',
+    location: 'Jewel Changi Airport, 78 Airport Blvd',
+    addressLine: 'Jewel Changi Airport, 78 Airport Blvd',
+    city: 'Singapore',
+    state: 'Central Region',
+    distance: '5.2 km away',
+    features: ['IMAX with Laser', 'Lumiere Premium', 'DTS:X Sound', 'VIP Dining'],
+    amenities: ['IMAX with Laser', 'Lumiere Premium', 'DTS:X Sound', 'VIP Dining'],
+    showtimes: [
+      { format: 'IMAX Laser 2D', times: ['11:30 AM', '02:45 PM', '06:15 PM', '09:30 PM'], price: 24 },
+      { format: 'Lumiere VIP', times: ['01:15 PM', '05:00 PM', '08:45 PM'], price: 38 },
+    ],
+  },
+  {
+    id: 'gsc-gurney-plaza-penang',
+    name: 'GSC Gurney Plaza Penang',
+    location: 'Gurney Plaza, Persiaran Gurney, George Town',
+    addressLine: 'Gurney Plaza, Persiaran Gurney, George Town',
+    city: 'Penang',
+    state: 'Pulau Pinang',
+    distance: '2.0 km away',
+    features: ['Dolby Atmos', 'Premiere Class', 'D-BOX Motion', 'GSC Play'],
+    amenities: ['Dolby Atmos', 'Premiere Class', 'D-BOX Motion'],
+    showtimes: [
+      { format: 'Dolby Atmos', times: ['12:00 PM', '03:15 PM', '06:45 PM', '10:00 PM'], price: 24 },
+      { format: 'D-BOX 2D', times: ['01:30 PM', '04:45 PM', '08:00 PM'], price: 32 },
+    ],
+  },
+  {
+    id: 'tgv-toppen-jb',
+    name: 'TGV Toppen Shopping Centre',
+    location: 'Toppen Shopping Centre, Taman Desa Tebrau',
+    addressLine: 'Toppen Shopping Centre, Taman Desa Tebrau',
+    city: 'Johor Bahru',
+    state: 'Johor',
+    distance: '6.4 km away',
+    features: ['Flexound Augmented Audio', 'Infinity Hall', 'Prestige Lounge'],
+    amenities: ['Flexound Augmented Audio', 'Infinity Hall', 'Prestige Lounge'],
+    showtimes: [
+      { format: 'Infinity Hall 2D', times: ['11:30 AM', '02:45 PM', '06:00 PM', '09:15 PM'], price: 22 },
+      { format: 'Prestige VIP', times: ['01:00 PM', '05:00 PM', '08:30 PM'], price: 45 },
+    ],
+  },
+  {
+    id: 'prasads-imax-hyderabad',
+    name: 'Prasads Multiplex & Large Screen',
+    location: 'NTR Gardens, Necklace Road',
+    addressLine: 'NTR Gardens, Necklace Road',
+    city: 'Hyderabad',
+    state: 'Telangana',
+    distance: '3.5 km away',
+    features: ['Giant Screen Large Format', 'Dolby Atmos', 'Gaming Zone'],
+    amenities: ['Giant Screen Large Format', 'Dolby Atmos', 'Gaming Zone'],
+    showtimes: [
+      { format: 'Large Screen 2D', times: ['10:30 AM', '01:45 PM', '05:00 PM', '08:15 PM', '11:30 PM'], price: 350 },
+      { format: 'Dolby Atmos', times: ['11:15 AM', '02:30 PM', '06:00 PM', '09:30 PM'], price: 250 },
     ],
   },
 ];
@@ -619,6 +733,28 @@ export function normalizeMediaItem(raw, index = 0) {
   };
 }
 
+export const AUTHORITATIVE_CITIES = [
+  { id: 'kuala-lumpur', name: 'Kuala Lumpur', state: 'Wilayah Persekutuan', country: 'Malaysia', countryCode: 'MY', isPopular: true },
+  { id: 'petaling-jaya', name: 'Petaling Jaya', state: 'Selangor', country: 'Malaysia', countryCode: 'MY', isPopular: true },
+  { id: 'penang', name: 'Penang', state: 'Pulau Pinang', country: 'Malaysia', countryCode: 'MY', isPopular: true },
+  { id: 'johor-bahru', name: 'Johor Bahru', state: 'Johor', country: 'Malaysia', countryCode: 'MY', isPopular: true },
+  { id: 'singapore', name: 'Singapore', state: 'Central Region', country: 'Singapore', countryCode: 'SG', isPopular: true },
+  { id: 'mumbai', name: 'Mumbai', state: 'Maharashtra', country: 'India', countryCode: 'IN', isPopular: true },
+  { id: 'delhi', name: 'Delhi-NCR', state: 'National Capital Region', country: 'India', countryCode: 'IN', isPopular: true },
+  { id: 'bengaluru', name: 'Bengaluru', state: 'Karnataka', country: 'India', countryCode: 'IN', isPopular: true },
+  { id: 'hyderabad', name: 'Hyderabad', state: 'Telangana', country: 'India', countryCode: 'IN', isPopular: true },
+  { id: 'chennai', name: 'Chennai', state: 'Tamil Nadu', country: 'India', countryCode: 'IN', isPopular: false },
+  { id: 'kolkata', name: 'Kolkata', state: 'West Bengal', country: 'India', countryCode: 'IN', isPopular: false },
+  { id: 'pune', name: 'Pune', state: 'Maharashtra', country: 'India', countryCode: 'IN', isPopular: false },
+  { id: 'ahmedabad', name: 'Ahmedabad', state: 'Gujarat', country: 'India', countryCode: 'IN', isPopular: false },
+  { id: 'jaipur', name: 'Jaipur', state: 'Rajasthan', country: 'India', countryCode: 'IN', isPopular: false },
+  { id: 'chandigarh', name: 'Chandigarh', state: 'Punjab', country: 'India', countryCode: 'IN', isPopular: false },
+  { id: 'kochi', name: 'Kochi', state: 'Kerala', country: 'India', countryCode: 'IN', isPopular: false },
+  { id: 'malacca', name: 'Malacca', state: 'Melaka', country: 'Malaysia', countryCode: 'MY', isPopular: false },
+  { id: 'ipoh', name: 'Ipoh', state: 'Perak', country: 'Malaysia', countryCode: 'MY', isPopular: false },
+  { id: 'kuching', name: 'Kuching', state: 'Sarawak', country: 'Malaysia', countryCode: 'MY', isPopular: false },
+  { id: 'kota-kinabalu', name: 'Kota Kinabalu', state: 'Sabah', country: 'Malaysia', countryCode: 'MY', isPopular: false },
+];
 
 export const api = {
   // ==================== AUTHENTICATION ====================
@@ -861,9 +997,10 @@ export const api = {
 
 
   // Events, Streams, Plays, Sports, Activities
-  async getEvents() {
+  async getEvents(city) {
     try {
-      const res = await fetch(`${API_BASE_URL}/events`);
+      const url = city ? `${API_BASE_URL}/events?city=${encodeURIComponent(city)}` : `${API_BASE_URL}/events`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.data || []);
@@ -996,9 +1133,66 @@ export const api = {
     }
   },
 
+  // ==================== CITIES & LOCATIONS ====================
+  async getCities(params) {
+    try {
+      const query = new URLSearchParams();
+      if (params?.search) query.set('search', params.search);
+      if (params?.popular) query.set('popular', 'true');
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/cities${qs}`);
+      if (res.ok) {
+        const body = await res.json();
+        if (body.success && Array.isArray(body.data)) {
+          return {
+            cities: body.data,
+            popular: body.popular || body.data.filter((c) => c.isPopular),
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('API getCities fetch error, using authoritative catalogue fallback:', e);
+    }
+
+    let list = AUTHORITATIVE_CITIES;
+    if (params?.search) {
+      const q = params.search.toLowerCase().trim();
+      list = list.filter((c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.state.toLowerCase().includes(q) ||
+        c.country.toLowerCase().includes(q) ||
+        c.id.includes(q)
+      );
+    } else if (params?.popular) {
+      list = list.filter((c) => c.isPopular);
+    }
+
+    return {
+      cities: list,
+      popular: AUTHORITATIVE_CITIES.filter((c) => c.isPopular),
+    };
+  },
+
+  async getCityById(cityId) {
+    if (!cityId) return null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/cities/${encodeURIComponent(cityId)}`);
+      if (res.ok) {
+        const body = await res.json();
+        if (body.success && body.data) return body.data;
+      }
+    } catch {
+      // Fallback
+    }
+    const clean = String(cityId).toLowerCase().trim();
+    return AUTHORITATIVE_CITIES.find(
+      (c) => c.id === clean || c.name.toLowerCase() === clean
+    ) || null;
+  },
+
   async getTheatres(city) {
     try {
-      const url = city && city !== 'All Cities'
+      const url = city && city !== 'All Cities' && city !== 'All'
         ? `${API_BASE_URL}/theatres?city=${encodeURIComponent(city)}`
         : `${API_BASE_URL}/theatres`;
       const res = await fetch(url);
@@ -1007,10 +1201,18 @@ export const api = {
         const list = Array.isArray(data) ? data : (data.data || []);
         if (list.length > 0) return list;
       }
-      return DEFAULT_FALLBACK_THEATRES;
-    } catch {
-      return DEFAULT_FALLBACK_THEATRES;
+    } catch (e) {
+      console.warn('API getTheatres error:', e);
     }
+
+    if (city && city !== 'All Cities' && city !== 'All') {
+      const q = city.toLowerCase().trim();
+      const filtered = DEFAULT_FALLBACK_THEATRES.filter(
+        (t) => t.city && (t.city.toLowerCase() === q || t.city.toLowerCase().includes(q) || q.includes(t.city.toLowerCase()))
+      );
+      return filtered;
+    }
+    return DEFAULT_FALLBACK_THEATRES;
   },
 
   async getOffers() {
@@ -1080,6 +1282,10 @@ export const api = {
   },
 
   async createBooking(payload) {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Please sign in or create an account to book tickets.');
+    }
     const res = await fetch(`${API_BASE_URL}/bookings`, {
       method: 'POST',
       headers: this.getAuthHeaders(),

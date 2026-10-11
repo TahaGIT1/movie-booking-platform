@@ -2,17 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { MapPin, Navigation } from 'lucide-react';
 import { BookingModal } from '../components/BookingModal';
+import { useLocationContext } from '../contexts/LocationContext';
 
 export const TheatresPage = () => {
-  const [selectedCity, setSelectedCity] = useState('All Cities');
+  const { selectedCity: globalCity, selectCity, openLocationModal, cities: catalogueCities } = useLocationContext();
+  const [selectedCity, setSelectedCity] = useState(() => globalCity ? globalCity.name : 'All Cities');
   const [selectedFeature, setSelectedFeature] = useState('All');
   const [bookingItem, setBookingItem] = useState(null);
   const [theatres, setTheatres] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Sync when global city changes
+  useEffect(() => {
+    if (globalCity) {
+      setSelectedCity(globalCity.name);
+    }
+  }, [globalCity]);
+
   useEffect(() => {
     let isMounted = true;
-    api.getTheatres(selectedCity).then((data) => {
+    setLoading(true);
+    api.getTheatres(selectedCity === 'All Cities' ? null : selectedCity).then((data) => {
       if (isMounted) {
         setTheatres(Array.isArray(data) ? data : []);
         setLoading(false);
@@ -28,12 +38,14 @@ export const TheatresPage = () => {
     };
   }, [selectedCity]);
 
-  const uniqueCities = Array.from(new Set(theatres.map((t) => t.city).filter(Boolean)));
-  const cities = ['All Cities', ...uniqueCities];
+  // Merge unique cities from fetched theatres with top catalogue cities
+  const uniqueFromTheatres = Array.from(new Set(theatres.map((t) => t.city).filter(Boolean)));
+  const topCities = catalogueCities.filter((c) => c.isPopular).map((c) => c.name);
+  const combinedCities = Array.from(new Set(['All Cities', ...uniqueFromTheatres, ...topCities]));
   const features = ['All', 'IMAX', 'Dolby Atmos', 'RECLINER', 'PARKING', 'CAFE'];
 
   const filteredTheatres = theatres.filter((t) => {
-    const matchCity = selectedCity === 'All Cities' || t.city === selectedCity;
+    const matchCity = selectedCity === 'All Cities' || t.city?.toLowerCase() === selectedCity.toLowerCase();
     const amenities = t.amenities || t.features || [];
     const matchFeature =
       selectedFeature === 'All' ||
@@ -64,10 +76,13 @@ export const TheatresPage = () => {
             <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider mr-1">
               City:
             </span>
-            {cities.map((city) => (
+            {combinedCities.map((city) => (
               <button
                 key={city}
-                onClick={() => setSelectedCity(city)}
+                onClick={() => {
+                  setSelectedCity(city);
+                  if (city !== 'All Cities') selectCity(city);
+                }}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
                   selectedCity === city
                     ? 'bg-[#f5a623] text-black font-semibold'
@@ -77,6 +92,12 @@ export const TheatresPage = () => {
                 {city}
               </button>
             ))}
+            <button
+              onClick={openLocationModal}
+              className="px-3 py-1.5 rounded-full text-xs font-medium text-[#f5a623] hover:bg-[#f5a623]/10 bg-white/5 border border-[#f5a623]/30 whitespace-nowrap cursor-pointer"
+            >
+              + Other Cities
+            </button>
           </div>
 
           {/* Feature Filter */}

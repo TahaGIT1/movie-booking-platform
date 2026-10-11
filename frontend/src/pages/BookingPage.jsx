@@ -2,10 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, MapPin, AlertCircle, Loader2, ChevronRight, Tag } from 'lucide-react';
 import { api } from '../services/api';
+import { useLocationContext } from '../contexts/LocationContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const BookingPage = () => {
     const { movieId } = useParams();
     const navigate = useNavigate();
+    const { selectedCity, openLocationModal } = useLocationContext();
+    const { user, openAuthModal } = useAuth();
 
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -43,12 +47,16 @@ export const BookingPage = () => {
         }
     }, [dates, selectedDate]);
 
-    // Fetch real theatres from DB
+    // Fetch real theatres from DB (filtered or prioritized by selected city)
     useEffect(() => {
         let isCancelled = false;
         (async () => {
             try {
-                const list = await api.getTheatres();
+                const cityParam = selectedCity ? selectedCity.name : null;
+                let list = await api.getTheatres(cityParam);
+                if (!list || list.length === 0) {
+                    list = await api.getTheatres();
+                }
                 if (!isCancelled && list && list.length > 0) {
                     setTheatres(list);
                     setSelectedTheatre(list[0].name || list[0].id);
@@ -60,7 +68,7 @@ export const BookingPage = () => {
         return () => {
             isCancelled = true;
         };
-    }, []);
+    }, [selectedCity]);
 
     // Fetch item details strictly from DB
     useEffect(() => {
@@ -225,9 +233,23 @@ export const BookingPage = () => {
 
     const handleConfirmBooking = async () => {
         if (selectedSeats.length === 0) return;
+
+        // Strict Requirement: User must be signed in to book tickets
+        if (!user) {
+            sessionStorage.setItem('tt_pending_booking', JSON.stringify({
+                movieId,
+                theatre: selectedTheatre,
+                date: selectedDate,
+                time: selectedTime,
+                seats: selectedSeats,
+            }));
+            setErrorMessage('Please sign in or create an account to reserve your tickets. Your seat selection is preserved.');
+            openAuthModal('login');
+            return;
+        }
+
         setIsSubmitting(true);
         setErrorMessage(null);
-        const currentUser = api.getCurrentUser();
         try {
             const response = await api.createBooking({
                 mediaId: item.id,
@@ -236,10 +258,11 @@ export const BookingPage = () => {
                 time: selectedTime,
                 seats: selectedSeats,
                 totalAmount,
-                customerName: currentUser?.fullName || 'Movie Customer',
-                customerEmail: currentUser?.email || 'customer@cineverse.com',
+                customerName: user.fullName || user.email || 'Ticket Total Customer',
+                customerEmail: user.email || 'customer@tickettotal.com',
             });
             if (response.success && response.booking) {
+                sessionStorage.removeItem('tt_pending_booking');
                 navigate('/payment', {
                     state: {
                         booking: {
@@ -267,6 +290,24 @@ export const BookingPage = () => {
             setIsSubmitting(false);
         }
     };
+
+    // Auto-resume booking flow once the user logs in
+    useEffect(() => {
+        if (!user) return;
+        const saved = sessionStorage.getItem('tt_pending_booking');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.movieId === movieId && selectedSeats.length > 0 && !isSubmitting) {
+                    sessionStorage.removeItem('tt_pending_booking');
+                    setErrorMessage(null);
+                    handleConfirmBooking();
+                }
+            } catch {
+                sessionStorage.removeItem('tt_pending_booking');
+            }
+        }
+    }, [user, movieId, selectedSeats]);
 
     const formatTimer = (totalSeconds) => {
         const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -362,10 +403,20 @@ export const BookingPage = () => {
                 {/* Selectors */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-[#f5a623]" />
-                            Select Cinema Theatre
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-[#f5a623]" />
+                                Select Cinema Theatre
+                            </label>
+                            <button
+                                type="button"
+                                onClick={openLocationModal}
+                                className="text-[11px] text-[#f5a623] hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                                <span>City: {selectedCity ? selectedCity.name : 'All'}</span>
+                                <span className="opacity-70">(Change)</span>
+                            </button>
+                        </div>
                         {theatres.length > 0 ? (
                             <select
                                 value={selectedTheatre}
@@ -536,6 +587,41 @@ export const BookingPage = () => {
                 </div>
                 {couponMessage && <div className="text-xs px-2 text-neutral-300 font-medium">{couponMessage}</div>}
 
+                {/* Auth & Validation Notice */}
+                {errorMessage && (
+                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-between gap-3 text-xs text-red-300">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                            <span>{errorMessage}</span>
+                        </div>
+                        {!user && (
+                            <button
+                                type="button"
+                                onClick={() => openAuthModal('login')}
+                                className="px-3 py-1.5 rounded-lg bg-[#f5a623] hover:bg-[#e09612] text-black font-bold text-xs shrink-0 transition-colors cursor-pointer"
+                            >
+                                Sign In Now
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {!user && selectedSeats.length > 0 && !errorMessage && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-300">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-[#f5a623]">🔒 Sign In Required:</span>
+                            <span>Please log in to finalize your seat reservation and generate your ticket.</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => openAuthModal('login')}
+                            className="text-[#f5a623] hover:text-white font-bold underline transition-colors cursor-pointer"
+                        >
+                            Sign In
+                        </button>
+                    </div>
+                )}
+
                 {/* Checkout Bar */}
                 <div className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
@@ -547,6 +633,11 @@ export const BookingPage = () => {
                             {appliedDiscount > 0 && (
                                 <span className="ml-2 text-emerald-400 font-bold">
                                     ({appliedDiscount}% OFF Applied)
+                                </span>
+                            )}
+                            {user && (
+                                <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-medium">
+                                    ✓ Booking as {user.fullName || user.email}
                                 </span>
                             )}
                         </div>
@@ -569,6 +660,11 @@ export const BookingPage = () => {
                             <>
                                 <Loader2 className="w-4 h-4 animate-spin" />
                                 <span>Reserving with Backend...</span>
+                            </>
+                        ) : !user ? (
+                            <>
+                                <span>Sign In to Reserve &amp; Pay</span>
+                                <ChevronRight className="w-4 h-4" />
                             </>
                         ) : (
                             <>

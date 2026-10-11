@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TicketQr } from '../components/TicketQr';
 import { buildTicketPayload } from '../utils/qrGenerator';
 import { ArrowLeft, MapPin, Calendar, Clock, Lock, CreditCard, Smartphone, Building2, AlertCircle, Loader2, Check, Download, Ticket as TicketIcon, } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 /** Convenience fee added for card payments, mirroring a real gateway. */
 const CARD_CONVENIENCE_FEE = 1.5;
 const PROCESSING_DELAY_MS = 2200;
@@ -67,6 +68,7 @@ function isExpiryValid(value) {
 export const PaymentPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user, openAuthModal } = useAuth();
     const routerState = location.state;
     // Booking data arrives from the seat-selection step via router state.
     const booking = routerState?.booking ?? null;
@@ -77,13 +79,17 @@ export const PaymentPage = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [paidBooking, setPaidBooking] = useState(null);
-    // Returning directly to /payment without a booking is a dead end.
+
+    // Returning directly to /payment without a booking or without login is a dead end.
     useEffect(() => {
+        if (!user) {
+            openAuthModal('login');
+        }
         if (!booking) {
             const timer = setTimeout(() => navigate('/', { replace: true }), 2200);
             return () => clearTimeout(timer);
         }
-    }, [booking, navigate]);
+    }, [booking, user, navigate, openAuthModal]);
     const convenienceFee = paymentMethod === 'card' ? CARD_CONVENIENCE_FEE : 0;
     const totalPayable = (booking?.totalAmount ?? 0) + convenienceFee;
     const cardBrand = useMemo(() => detectCardBrand(card.number), [card.number]);
@@ -143,8 +149,8 @@ export const PaymentPage = () => {
                 time: booking.time,
                 seats: booking.seats,
                 totalAmount: booking.totalAmount,
-                customerName: 'Marcus Levin',
-                customerEmail: 'marcus@example.com',
+                customerName: user?.fullName || booking.customerName || 'Ticket Total Customer',
+                customerEmail: user?.email || booking.customerEmail || 'customer@tickettotal.com',
                 createdAt: new Date().toISOString(),
                 qrCodeData: `https://cinepass.my/verify/${booking.orderId}`,
                 status: 'CONFIRMED',

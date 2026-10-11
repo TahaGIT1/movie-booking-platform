@@ -4,7 +4,9 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { SearchModal } from './components/SearchModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { CitySelectionModal } from './components/CitySelectionModal';
 import { AuthProvider } from './contexts/AuthContext';
+import { LocationProvider } from './contexts/LocationContext';
 // Customer Discovery & Booking Pages
 import { HomePage } from './pages/HomePage';
 import { EventsPage } from './pages/EventsPage';
@@ -48,6 +50,7 @@ function AppLayout() {
     return (<div className="min-h-screen bg-[#0a0b0e] text-white flex flex-col font-sans selection:bg-[#f5a623] selection:text-black">
       {/* Global Modals */}
       <AuthModal />
+      <CitySelectionModal />
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)}/>
 
       {/* Global Navbar for discovery routes */}
@@ -116,7 +119,9 @@ function AppLayout() {
 export function App() {
     return (<Router>
       <AuthProvider>
-        <AppLayout />
+        <LocationProvider>
+          <AppLayout />
+        </LocationProvider>
       </AuthProvider>
     </Router>);
 }

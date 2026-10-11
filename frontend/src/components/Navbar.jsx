@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Search, Menu, X, MapPin, ChevronDown, User, Tag, Film, LogOut, Building2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocationContext } from '../contexts/LocationContext';
 
 export const Navbar = ({ onOpenSearch }) => {
     const { user, token, logout, openAuthModal } = useAuth();
+    const { selectedCity, openLocationModal } = useLocationContext();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [selectedLocation, setSelectedLocation] = useState('Malaysia, Global');
-    const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
     const location = useLocation();
 
     const handleLogout = () => {
@@ -21,15 +21,6 @@ export const Navbar = ({ onOpenSearch }) => {
         { label: 'Plays', path: '/plays' },
         { label: 'Sports', path: '/sports' },
         { label: 'Activities', path: '/activities' },
-    ];
-
-    const locations = [
-        'Malaysia, Global',
-        'Kuala Lumpur, MY',
-        'Petaling Jaya, MY',
-        'Penang, MY',
-        'Johor Bahru, MY',
-        'Singapore, SG',
     ];
 
     const isLinkActive = (path) => {
@@ -75,34 +66,17 @@ export const Navbar = ({ onOpenSearch }) => {
                         {/* Location Selector */}
                         <div className="relative hidden md:block">
                             <button
-                                onClick={() => setLocationDropdownOpen(!locationDropdownOpen)}
-                                className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 bg-white/5 transition-colors cursor-pointer"
+                                onClick={openLocationModal}
+                                aria-label="Choose your city"
+                                aria-haspopup="dialog"
+                                className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#f5a623]"
                             >
-                                <MapPin className="w-3.5 h-3.5 text-[#f5a623]" />
-                                <span className="max-w-[120px] truncate">{selectedLocation}</span>
-                                <ChevronDown className="w-3 h-3 text-neutral-400" />
+                                <MapPin className="w-3.5 h-3.5 text-[#f5a623] shrink-0" />
+                                <span className={`max-w-[130px] truncate font-medium ${!selectedCity ? 'text-[#f5a623]' : 'text-neutral-200'}`}>
+                                    {selectedCity ? selectedCity.name : 'Select City'}
+                                </span>
+                                <ChevronDown className="w-3 h-3 text-neutral-400 shrink-0" />
                             </button>
-
-                            {locationDropdownOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-[#11131c] border border-white/15 rounded-xl shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
-                                    {locations.map((loc) => (
-                                        <button
-                                            key={loc}
-                                            onClick={() => {
-                                                setSelectedLocation(loc);
-                                                setLocationDropdownOpen(false);
-                                            }}
-                                            className={`w-full text-left px-3.5 py-2 text-xs transition-colors cursor-pointer ${
-                                                selectedLocation === loc
-                                                    ? 'text-[#f5a623] font-semibold bg-white/5'
-                                                    : 'text-neutral-300 hover:text-white hover:bg-white/10'
-                                            }`}
-                                        >
-                                            {loc}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
 
                         {/* List Cinema for Managers */}
@@ -361,12 +335,24 @@ export const Navbar = ({ onOpenSearch }) => {
                             </div>
                         </div>
 
-                        {/* Footer Region Selector */}
+                        {/* Footer Region / City Selector */}
                         <div className="pt-4 border-t border-white/10 mt-6">
-                            <div className="flex items-center gap-2 text-xs text-neutral-400">
-                                <MapPin className="w-3.5 h-3.5 text-[#f5a623]" />
-                                <span>Region: {selectedLocation}</span>
-                            </div>
+                            <button
+                                onClick={() => {
+                                    setMobileMenuOpen(false);
+                                    openLocationModal();
+                                }}
+                                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                                aria-label="Choose your city"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <MapPin className="w-4 h-4 text-[#f5a623]" />
+                                    <span>
+                                        City: <strong className="text-white font-semibold">{selectedCity ? selectedCity.name : 'Select City'}</strong>
+                                    </span>
+                                </div>
+                                <span className="text-[11px] text-[#f5a623] font-medium">Change →</span>
+                            </button>
                         </div>
                     </div>
                 </div>

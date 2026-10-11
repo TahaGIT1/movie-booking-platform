@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, MapPin, Clock, Ticket, Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
+import { useLocationContext } from '../contexts/LocationContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const BookingModal = ({ item, onClose }) => {
+    const { selectedCity, openLocationModal } = useLocationContext();
+    const { user, openAuthModal } = useAuth();
     const [theatres, setTheatres] = useState([]);
     const [selectedTheatre, setSelectedTheatre] = useState('');
     const [selectedDate, setSelectedDate] = useState('');
@@ -31,12 +35,16 @@ export const BookingModal = ({ item, onClose }) => {
         }
     }, [dates, selectedDate]);
 
-    // Fetch real theatres from DB
+    // Fetch real theatres from DB (filtered by selected city)
     useEffect(() => {
         let isMounted = true;
         (async () => {
             try {
-                const list = await api.getTheatres();
+                const cityParam = selectedCity ? selectedCity.name : null;
+                let list = await api.getTheatres(cityParam);
+                if (!list || list.length === 0) {
+                    list = await api.getTheatres();
+                }
                 if (isMounted && list && list.length > 0) {
                     setTheatres(list);
                     setSelectedTheatre(list[0].name || list[0].id);
@@ -48,7 +56,7 @@ export const BookingModal = ({ item, onClose }) => {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [selectedCity]);
 
     // Compute showtimes
     const showtimes = useMemo(() => {
@@ -115,9 +123,16 @@ export const BookingModal = ({ item, onClose }) => {
 
     const handleProceedBooking = async () => {
         if (selectedSeats.length === 0) return;
+
+        // Strict Requirement: User must be signed in to book tickets
+        if (!user) {
+            setErrorMessage('Please sign in or create an account to reserve your tickets.');
+            openAuthModal('login');
+            return;
+        }
+
         setIsSubmitting(true);
         setErrorMessage(null);
-        const currentUser = api.getCurrentUser();
         try {
             const response = await api.createBooking({
                 mediaId: item.id,
@@ -126,8 +141,8 @@ export const BookingModal = ({ item, onClose }) => {
                 time: selectedTime,
                 seats: selectedSeats,
                 totalAmount,
-                customerName: currentUser?.fullName || 'Movie Customer',
-                customerEmail: currentUser?.email || 'customer@cineverse.com',
+                customerName: user.fullName || user.email || 'Ticket Total Customer',
+                customerEmail: user.email || 'customer@tickettotal.com',
             });
             if (response.success && response.booking) {
                 setConfirmedBooking(response.booking);
@@ -183,10 +198,19 @@ export const BookingModal = ({ item, onClose }) => {
                         {/* Selectors: Theatre, Date, Time */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                    <MapPin className="w-3.5 h-3.5 text-[#f5a623]" />
-                                    Select Theatre
-                                </label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <MapPin className="w-3.5 h-3.5 text-[#f5a623]" />
+                                        Select Theatre
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={openLocationModal}
+                                        className="text-[10px] text-[#f5a623] hover:underline cursor-pointer"
+                                    >
+                                        {selectedCity ? selectedCity.name : 'All Cities'}
+                                    </button>
+                                </div>
                                 {theatres.length > 0 ? (
                                     <select
                                         value={selectedTheatre}
@@ -319,6 +343,38 @@ export const BookingModal = ({ item, onClose }) => {
                             </div>
                         </div>
 
+                        {/* Auth / Error Alert */}
+                        {errorMessage && (
+                            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-between gap-3 text-xs text-red-300">
+                                <div className="flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                                    <span>{errorMessage}</span>
+                                </div>
+                                {!user && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openAuthModal('login')}
+                                        className="px-2.5 py-1 rounded bg-[#f5a623] text-black font-bold text-xs shrink-0 cursor-pointer"
+                                    >
+                                        Sign In
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {!user && selectedSeats.length > 0 && !errorMessage && (
+                            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs text-amber-300">
+                                <span>🔒 Sign in required to finalize ticket reservation.</span>
+                                <button
+                                    type="button"
+                                    onClick={() => openAuthModal('login')}
+                                    className="font-bold underline text-[#f5a623] cursor-pointer"
+                                >
+                                    Sign In
+                                </button>
+                            </div>
+                        )}
+
                         {/* Bottom Confirmation Bar */}
                         <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div>
@@ -327,6 +383,11 @@ export const BookingModal = ({ item, onClose }) => {
                                     <span className="text-white font-semibold">
                                         {selectedSeats.join(', ') || 'None'}
                                     </span>
+                                    {user && (
+                                        <span className="ml-2 text-[10px] text-emerald-400 font-medium">
+                                            (Booking as {user.fullName || user.email})
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="text-lg font-heading font-black text-[#f5a623] mt-0.5">
                                     ₹ {totalAmount.toFixed(2)}
@@ -345,6 +406,11 @@ export const BookingModal = ({ item, onClose }) => {
                                     <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         <span>Booking with API...</span>
+                                    </>
+                                ) : !user ? (
+                                    <>
+                                        <span>Sign In to Reserve</span>
+                                        <ChevronRight className="w-4 h-4" />
                                     </>
                                 ) : (
                                     <>

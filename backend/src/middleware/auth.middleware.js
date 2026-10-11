@@ -16,10 +16,22 @@ export const authenticate = async (req, res, next) => {
     const userId = decoded.userId || decoded.id;
     if (!userId) throw new AppError(401, 'Invalid token payload', 'INVALID_TOKEN');
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, role: true, theatreId: true, isBlocked: true, fullName: true, email: true }
-    });
+    let user = null;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true, theatreId: true, isBlocked: true, fullName: true, email: true }
+      });
+    } catch (dbErr) {
+      // If DB is offline, fall back to claims in the verified token
+      user = {
+        id: userId,
+        role: decoded.role || 'CUSTOMER',
+        fullName: decoded.fullName || decoded.name || 'Member',
+        email: decoded.email || 'customer@cineverse.com',
+        isBlocked: false,
+      };
+    }
 
     if (!user) {
       throw new AppError(401, 'User no longer exists', 'USER_NOT_FOUND');
