@@ -1,22 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { 
-  Users, 
-  Plus, 
-  ShieldCheck, 
-  QrCode, 
-  Trash2, 
-  Lock, 
-  Unlock, 
-  UserPlus, 
-  CheckCircle2, 
-  AlertCircle, 
-  X, 
-  ScanLine, 
-  Mail, 
-  Phone, 
-  RefreshCw 
-} from 'lucide-react';
+import {  
+  Users, Plus, ShieldCheck, QrCode, Trash2, Lock, Unlock, UserPlus, CheckCircle2, AlertCircle, X, ScanLine, RefreshCw 
+ } from 'lucide-react';
 import { api } from '../../services/api.service';
 
 export const ManagerStaff = () => {

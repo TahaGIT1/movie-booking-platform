@@ -1,27 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  Plus, 
-  Search, 
-  MapPin, 
-  FileText, 
-  User, 
-  Mail, 
-  Phone, 
-  Tv, 
-  Layers, 
-  CheckCircle2, 
-  Eye, 
-  X, 
-  RefreshCw, 
-  CalendarDays,
-  Sparkles,
-  ShieldCheck,
-  ChevronRight,
-  ExternalLink,
-  Trash2,
-  AlertTriangle
-} from 'lucide-react';
+import { Building2, Plus, Search, MapPin, FileText, User, Mail, Tv, Eye, X, RefreshCw, Sparkles, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api.service';
 
 export const ManageTheatres = () => {

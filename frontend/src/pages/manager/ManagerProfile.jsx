@@ -1,21 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { 
-  Building2, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  XCircle, 
-  Save, 
-  FileText, 
-  ShieldCheck, 
-  Sparkles, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  FileCheck2,
-  RefreshCw 
-} from 'lucide-react';
+import { Building2, CheckCircle2, Clock, AlertTriangle, XCircle, Save, FileText, FileCheck2 } from 'lucide-react';
 import { api } from '../../services/api.service';
 
 const ALL_AMENITIES = [

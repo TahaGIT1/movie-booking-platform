@@ -1,23 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import { 
-  Tv2, 
-  CalendarDays, 
-  Ticket, 
-  TrendingUp, 
-  Plus, 
-  Users, 
-  Clock, 
-  Film, 
-  Sparkles, 
-  ChevronRight, 
-  ShieldCheck, 
-  CheckCircle2, 
-  RefreshCw, 
-  Building2,
-  Tag,
-  Coins
-} from 'lucide-react';
+import {
+  Tv2, CalendarDays, Ticket, TrendingUp, Plus, Users, Clock, Film, CheckCircle2, RefreshCw, Building2, Coins, ChevronRight
+ } from 'lucide-react';
 import { api } from '../../services/api.service';
 import { EditPricingModal } from '../../components/manager/EditPricingModal';
 

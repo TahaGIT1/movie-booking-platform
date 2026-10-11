@@ -165,6 +165,7 @@ export const BookingModal = ({ item, onClose }) => {
                     </div>
                     <button
                         onClick={onClose}
+                        aria-label="Close booking dialog"
                         className="p-2 rounded-lg text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
                     >
                         <X className="w-5 h-5" />

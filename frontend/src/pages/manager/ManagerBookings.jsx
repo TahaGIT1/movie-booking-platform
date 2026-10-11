@@ -1,23 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { 
-  Ticket, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  QrCode, 
-  Eye, 
-  Armchair, 
-  User, 
-  Mail, 
-  Phone, 
-  Calendar,
-  X,
-  RefreshCw,
-  TrendingUp
-} from 'lucide-react';
+import { Ticket, Search, Filter, Clock, QrCode, User, Mail, Phone, X, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api.service';
 
 export const ManagerBookings = () => {

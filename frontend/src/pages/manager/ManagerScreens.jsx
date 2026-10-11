@@ -1,26 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { 
-  Tv2, 
-  Plus, 
-  Trash2, 
-  Armchair, 
-  Accessibility, 
-  AlertTriangle, 
-  Check, 
-  X, 
-  Sparkles, 
-  Sliders, 
-  Volume2, 
-  Save, 
-  RefreshCw,
-  Footprints,
-  LayoutGrid,
-  Route,
-  CheckSquare,
-  Square,
-  HelpCircle
-} from 'lucide-react';
+import { Tv2, Plus, Trash2, Armchair, Accessibility, AlertTriangle, X, Sliders, Volume2, Save, RefreshCw, Footprints, LayoutGrid } from 'lucide-react';
 import { api } from '../../services/api.service';
 
 export const ManagerScreens = () => {

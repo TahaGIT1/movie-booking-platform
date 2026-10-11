@@ -1,27 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Building2, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  AlertTriangle, 
-  Search, 
-  Filter, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  FileText, 
-  Sparkles, 
-  ShieldAlert, 
-  RefreshCw, 
-  ExternalLink,
-  ChevronRight,
-  Eye,
-  Check,
-  X
-} from 'lucide-react';
+import { Building2, CheckCircle2, XCircle, Clock, AlertTriangle, Search, User, MapPin, FileText, ShieldAlert, RefreshCw, Eye, Check, X } from 'lucide-react';
 import { api } from '../../services/api.service';
 
 const REASON_PRESETS = [

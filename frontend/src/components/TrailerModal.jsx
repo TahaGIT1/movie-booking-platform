@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Ticket, Volume2, Star } from 'lucide-react';
+import { X, Ticket, Volume2 } from 'lucide-react';
 const STREAM_TRAILERS = {
   'fall 2: deadpoint': 'cW798YSw0Og',
   'fall 2': 'cW798YSw0Og',

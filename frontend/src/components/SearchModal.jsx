@@ -157,7 +157,8 @@ export const SearchModal = ({ isOpen, onClose }) => {
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="p-1 rounded-full hover:bg-white/10 text-neutral-400 hover:text-white"
+              aria-label="Clear search"
+              className="p-1 rounded-full hover:bg-white/10 text-neutral-400 hover:text-white cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
