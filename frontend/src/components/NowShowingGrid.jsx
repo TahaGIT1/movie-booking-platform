@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Star, Ticket, Clock, Info, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { EmptyState } from './EmptyState';
 export const NowShowingGrid = ({
     items,
     onBook,
@@ -18,6 +19,9 @@ export const NowShowingGrid = ({
         const itemFormats = Array.isArray(item.formats) ? item.formats : [];
         return itemFormats.some((f) => f.toLowerCase().includes(selectedFormat.toLowerCase()));
     });
+    // The format filter can empty out a non-empty `items` array, which used to
+    // render a bare header above a blank grid.
+    const isFilteredEmpty = items.length > 0 && filteredItems.length === 0;
     return (<section className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-10 py-10 sm:py-14">
       {/* Header, category tabs and format filter tabs */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -81,7 +85,12 @@ export const NowShowingGrid = ({
 
 
       {/* Grid of Posters */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
+      {isFilteredEmpty && (<EmptyState
+        icon={Ticket}
+        title={`No ${selectedFormat} shows scheduled`}
+        message={`None of the movies currently playing in Belagavi are showing in ${selectedFormat} format. Try another format or check back soon.`}
+      />)}
+      {filteredItems.length > 0 && (<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
         {filteredItems.map((item) => (<div key={item.id} className="group relative flex flex-col rounded-2xl overflow-hidden bg-[#11131c] border border-white/10 hover:border-[#f5a623]/60 transition-all duration-300 hover:-translate-y-1 shadow-xl">
             {/* Poster Image Container */}
             <div className="relative aspect-[2/3] w-full overflow-hidden bg-neutral-900">
@@ -95,7 +104,7 @@ export const NowShowingGrid = ({
                 {item.badgeTopRight && (<span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/75 backdrop-blur-md border border-white/20 text-white shadow-md">
                     {item.badgeTopRight}
                   </span>)}
-                {item.formats[0] && (<span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#f5a623]/90 text-black shadow-md">
+                {Array.isArray(item.formats) && item.formats[0] && (<span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#f5a623]/90 text-black shadow-md">
                     {item.formats[0]}
                   </span>)}
               </div>
@@ -144,11 +153,11 @@ export const NowShowingGrid = ({
                   {item.duration || '2h 20m'}
                 </span>
                 <span className="font-semibold text-white">
-                  From RM {item.priceRM || 22}
+                  From ₹{item.priceRM || 22}
                 </span>
               </div>
             </div>
           </div>))}
-      </div>
+      </div>)}
     </section>);
 };

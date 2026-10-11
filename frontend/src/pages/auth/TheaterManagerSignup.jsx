@@ -1,28 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Building2, 
-  User, 
-  Mail, 
-  Lock, 
-  Phone, 
-  MapPin, 
-  CheckCircle2, 
-  AlertCircle, 
-  Film, 
-  Eye, 
-  EyeOff, 
-  Sparkles, 
-  ShieldCheck, 
-  ArrowRight, 
-  ArrowLeft,
-  Tv,
-  Layers,
-  Award,
-  ChevronRight,
-  Clock,
-  FileCheck
-} from 'lucide-react';
+import {
+  Building2, User, Lock, Phone, MapPin, Mail, CheckCircle2, AlertCircle, Film, Eye, EyeOff, Sparkles, ShieldCheck, ArrowRight, ArrowLeft, Tv, Layers, Award, ChevronRight, Clock, FileCheck
+ } from 'lucide-react';
 import { api } from '../../services/api.service';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -378,7 +358,7 @@ export const TheaterManagerSignup = () => {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
               <button
-                onClick={() => navigate('/admin')}
+                onClick={() => navigate('/manager')}
                 className="w-full sm:w-auto flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3.5 px-6 rounded-xl transition shadow-[0_0_20px_rgba(234,179,8,0.3)] flex items-center justify-center gap-2"
               >
                 Go to Manager Dashboard
@@ -859,14 +839,7 @@ export const TheaterManagerSignup = () => {
           Already registered as a Theatre Manager?{' '}
           <button 
             type="button"
-            onClick={() => {
-              navigate('/');
-              // Opens login modal via custom event or user interaction
-              setTimeout(() => {
-                const btn = document.querySelector('[data-auth-trigger="login"]');
-                if (btn) btn.click();
-              }, 100);
-            }} 
+            onClick={() => navigate('/login')}
             className="text-yellow-500 hover:underline font-bold"
           >
             Sign in to Manager Portal

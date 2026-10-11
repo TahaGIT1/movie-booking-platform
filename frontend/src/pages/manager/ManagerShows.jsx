@@ -1,28 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { 
-  CalendarDays, 
-  Plus, 
-  Clock, 
-  Film, 
-  Tv2, 
-  Trash2, 
-  Ban, 
-  AlertCircle, 
-  CheckCircle2, 
-  Filter, 
-  X, 
-  Tag, 
-  DollarSign, 
-  ChevronRight, 
-  RefreshCw,
-  Edit3,
-  Coins,
-  Sparkles,
-  ArrowUpDown,
-  LayoutGrid,
-  ListFilter
-} from 'lucide-react';
+import { CalendarDays, Plus, Clock, Film, Tv2, Trash2, Ban, AlertCircle, Filter, X, RefreshCw, Edit3, Coins } from 'lucide-react';
 import { api } from '../../services/api.service';
 import { EditPricingModal } from '../../components/manager/EditPricingModal';
 
@@ -353,7 +331,9 @@ export const ManagerShows = () => {
         <div className="space-y-6">
           {showsByMovie.map(({ movie: groupMovie, shows: groupShows }) => (
             <div 
-              key={groupMovie?.id || Math.random()} 
+              // A Math.random() key regenerates on every render, forcing React to
+              // unmount and remount the whole group (losing focus and state).
+              key={groupMovie?.id || `unmatched-${groupShows.length}-${groupShows[0]?.id ?? ''}`} 
               className="bg-[#101216] border border-white/5 hover:border-yellow-500/20 rounded-2xl p-6 transition space-y-5"
             >
               {/* Movie Header Card */}

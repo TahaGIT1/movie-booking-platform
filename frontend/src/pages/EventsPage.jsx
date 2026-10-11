@@ -2,24 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { HeroSection } from '../components/HeroSection';
 import { api } from '../services/api';
 import { BookingModal } from '../components/BookingModal';
-import { Star, Ticket } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { CardSkeletonGrid } from '../components/CardSkeletonGrid';
+import { Star, Ticket, PartyPopper } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const EventsPage = () => {
   const [bookingItem, setBookingItem] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     api.getEvents().then((data) => {
       if (isMounted) {
         setEvents(Array.isArray(data) ? data : []);
+        setFailed(false);
         setLoading(false);
       }
     }).catch(() => {
       if (isMounted) {
         setEvents([]);
+        setFailed(true);
         setLoading(false);
       }
     });
@@ -114,7 +119,7 @@ export const EventsPage = () => {
 
                     <div className="flex items-center gap-2">
                       <Link
-                        to={`/movie/${item.id}`}
+                        to={`/events/${item.id}`}
                         className="px-3 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-semibold text-neutral-300 transition"
                       >
                         Info
@@ -132,13 +137,22 @@ export const EventsPage = () => {
               </div>
             ))}
           </div>
-        ) : !loading ? (
-          <div className="p-12 text-center rounded-2xl bg-[#11131c] border border-white/10">
-            <div className="text-3xl mb-3">🎪</div>
-            <h3 className="text-lg font-bold text-white mb-1">No Live Events Found in Database</h3>
-            <p className="text-xs text-neutral-400">There are currently no concerts or live events scheduled.</p>
-          </div>
-        ) : null}
+        ) : loading ? (
+          <CardSkeletonGrid count={8}/>
+        ) : failed ? (
+          <EmptyState
+            variant="offline"
+            title="Could not load live events"
+            message="We could not reach the listings service. Check that the backend is running, then try again."
+          />
+        ) : (
+          <EmptyState
+            icon={PartyPopper}
+            title="No upcoming events in Belagavi"
+            message="Concerts, comedy shows and festivals for Belagavi are announced a few weeks out. Follow this page to catch them as soon as they go on sale."
+            action={{ label: 'Browse movies instead', to: '/' }}
+          />
+        )}
       </section>
 
       {bookingItem && (

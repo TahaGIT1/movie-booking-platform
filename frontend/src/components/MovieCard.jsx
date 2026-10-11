@@ -40,7 +40,9 @@ export const MovieCard = forwardRef(({ item, isSelected = false, onClick, header
             {item.title}
           </h3>
           <p className="text-[10px] text-neutral-400 capitalize mt-0.5 line-clamp-1">
-            {item.genre.split(',')[0]}
+            {String(item.genre || '')
+              .split(',')[0]
+              .trim()}
           </p>
         </div>
 

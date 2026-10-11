@@ -2,24 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { HeroSection } from '../components/HeroSection';
 import { api } from '../services/api';
 import { BookingModal } from '../components/BookingModal';
-import { Star, Zap } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { CardSkeletonGrid } from '../components/CardSkeletonGrid';
+import { Star, Zap, Ticket as TicketIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const ActivitiesPage = () => {
   const [bookingItem, setBookingItem] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     api.getActivities().then((data) => {
       if (isMounted) {
         setActivities(Array.isArray(data) ? data : []);
+        setFailed(false);
         setLoading(false);
       }
     }).catch(() => {
       if (isMounted) {
         setActivities([]);
+        setFailed(true);
         setLoading(false);
       }
     });
@@ -112,7 +117,7 @@ export const ActivitiesPage = () => {
 
                     <div className="flex items-center gap-2">
                       <Link
-                        to={`/movie/${item.id}`}
+                        to={`/activities/${item.id}`}
                         className="px-3 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-semibold text-neutral-300 transition"
                       >
                         Info
@@ -130,13 +135,22 @@ export const ActivitiesPage = () => {
               </div>
             ))}
           </div>
-        ) : !loading ? (
-          <div className="p-12 text-center rounded-2xl bg-[#11131c] border border-white/10">
-            <div className="text-3xl mb-3">🎢</div>
-            <h3 className="text-lg font-bold text-white mb-1">No Activities Found in Database</h3>
-            <p className="text-xs text-neutral-400">There are currently no theme parks or attraction passes scheduled.</p>
-          </div>
-        ) : null}
+        ) : loading ? (
+          <CardSkeletonGrid count={8}/>
+        ) : failed ? (
+          <EmptyState
+            variant="offline"
+            title="Could not load activities"
+            message="We could not reach the listings service. Check that the backend is running, then try again."
+          />
+        ) : (
+          <EmptyState
+            icon={TicketIcon}
+            title="No upcoming activities in Belagavi"
+            message="Theme parks, attraction passes and family experiences are listed here once partners confirm dates for Belagavi."
+            action={{ label: 'Browse movies instead', to: '/' }}
+          />
+        )}
       </section>
 
       {bookingItem && (

@@ -1,23 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { Rating } from '../components/Rating';
 import { Badge } from '../components/Badge';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { BookingModal } from '../components/BookingModal';
-import { ArrowLeft, Calendar, MapPin, Heart, Share2 } from 'lucide-react';
+import {  ArrowLeft, Calendar, Heart, Share2  } from 'lucide-react';
+
+/**
+ * This single route renders /events/:id, /plays/:id, /sports/:id and
+ * /activities/:id. It previously always called `getEventById`, so opening a
+ * play, a sport or an activity always fell through to "Not Found" because the
+ * id was looked up against the events endpoint.
+ */
+const CATEGORY_LOADERS = {
+  events: { fetch: (id) => api.getEventById(id), noun: 'event' },
+  plays: { fetch: (id) => api.getPlayById(id), noun: 'play' },
+  sports: { fetch: (id) => api.getSportById(id), noun: 'sport' },
+  activities: { fetch: (id) => api.getActivityById(id), noun: 'activity' },
+};
 
 export const EventDetailsPage = () => {
   const { id } = useParams();
+  const location = useLocation();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
 
+  // Derive the category from the pathname so the correct loader is used.
+  const category = useMemo(() => {
+    const segment = location.pathname.split('/').filter(Boolean)[0] || 'events';
+    return CATEGORY_LOADERS[segment] ? segment : 'events';
+  }, [location.pathname]);
+
+  const { fetch: loadById, noun } = CATEGORY_LOADERS[category];
+
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
-    api.getEventById(id).then((data) => {
+    setLoading(true);
+    loadById(id).then((data) => {
       if (isMounted) {
         setEvent(data || null);
         setLoading(false);
@@ -31,12 +54,12 @@ export const EventDetailsPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, loadById]);
 
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-neutral-400">
-        Loading event details from database...
+        Loading {noun} details from database...
       </div>
     );
   }
@@ -115,6 +138,7 @@ export const EventDetailsPage = () => {
                     alert('Link copied to clipboard!');
                   }
                 }}
+                aria-label="Share this event"
                 className="p-2.5 rounded-xl border border-white/10 bg-white/5 text-neutral-300 hover:border-white/20 transition-colors cursor-pointer"
               >
                 <Share2 className="w-4 h-4" />

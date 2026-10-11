@@ -132,26 +132,31 @@ export const BookingPage = () => {
         };
     }, [selectedTheatre, selectedDate, selectedTime]);
 
-    // Countdown timer effect when seats are selected
+    // Countdown timer effect when seats are selected.
+    //
+    // The interval used to depend on `selectedSeats`, so every seat toggle tore
+    // the timer down and restarted it at 5:00 — the hold could never expire
+    // while the user was still clicking. It now runs once the first seat is
+    // picked (deps: []), and the release call is made outside the state updater
+    // because updaters must stay pure (StrictMode invokes them twice in dev).
     useEffect(() => {
-        if (selectedSeats.length === 0) {
-            setHoldSecondsLeft(300);
-            return;
-        }
+        if (selectedSeats.length === 0) return undefined;
+
         const timer = setInterval(() => {
-            setHoldSecondsLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    api.releaseSeats('show-live', selectedSeats);
-                    setSelectedSeats([]);
-                    setErrorMessage('Your 5-minute seat hold expired. Please re-select your seats.');
-                    return 300;
-                }
-                return prev - 1;
-            });
+            setHoldSecondsLeft((prev) => (prev <= 1 ? 0 : prev - 1));
         }, 1000);
         return () => clearInterval(timer);
-    }, [selectedSeats]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Side effects for expiry live in their own effect so they run exactly once
+    // when the countdown reaches zero.
+    useEffect(() => {
+        if (holdSecondsLeft !== 0 || selectedSeats.length === 0) return;
+        api.releaseSeats('show-live', selectedSeats);
+        setSelectedSeats([]);
+        setErrorMessage('Your 5-minute seat hold expired. Please re-select your seats.');
+    }, [holdSecondsLeft, selectedSeats]);
 
     const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
     const cols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -240,9 +245,13 @@ export const BookingPage = () => {
                 customerEmail: currentUser?.email || 'customer@cineverse.com',
             });
             if (response.success && response.booking) {
-                navigate('/payment', {
+                // Continue into the real Razorpay-backed checkout.
+                navigate('/checkout', {
                     state: {
                         booking: {
+                            // bookingId is what the payments API needs to create
+                            // an order; orderId is only the human reference.
+                            bookingId: response.booking.bookingId ?? response.booking.id,
                             orderId: response.booking.orderId,
                             mediaId: response.booking.mediaId,
                             theatreName: response.booking.theatreName,
@@ -250,6 +259,7 @@ export const BookingPage = () => {
                             time: response.booking.time,
                             seats: response.booking.seats,
                             totalAmount: response.booking.totalAmount,
+                            qrCodeData: response.booking.qrCodeData,
                             title: response.booking.title,
                             posterImage: response.booking.posterImage,
                         },

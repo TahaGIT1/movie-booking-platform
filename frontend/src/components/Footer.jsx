@@ -56,7 +56,7 @@ export const Footer = () => {
               />
             </Link>
             <p className="text-neutral-400 leading-relaxed max-w-sm text-xs sm:text-sm">
-              Malaysia & Southeast Asia's premier destination for cinema showtimes, blockbuster pre-booking, live music festivals, broadway stage plays, and 4K digital streams.
+              Belagavi & Karnataka's premier destination for cinema showtimes, blockbuster pre-booking, live music festivals, broadway stage plays, and 4K digital streams.
             </p>
 
             {/* Newsletter Subscription */}
@@ -93,8 +93,8 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/#coming-soon" className="hover:text-white transition-colors">
-                  Upcoming Releases 2024–2025
+                <Link to="/offers" className="hover:text-white transition-colors">
+                  Upcoming Releases &amp; Promotions
                 </Link>
               </li>
               <li>
@@ -108,8 +108,8 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/#imax" className="hover:text-white transition-colors">
-                  IMAX 70MM Screenings
+                <Link to="/theatres" className="hover:text-white transition-colors">
+                  IMAX &amp; Premium Screenings
                 </Link>
               </li>
             </ul>
@@ -173,7 +173,7 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="#faq" onClick={(e) => { e.preventDefault(); alert("24/7 Support Hotline: 1800-88-CINE (2463) or email help@cinepass.com"); }} className="hover:text-white transition-colors">
+                <a href="#faq" onClick={(e) => { e.preventDefault(); alert("24/7 Support Hotline: 1800-88-CINE (2463) or email support@tickettotal.in"); }} className="hover:text-white transition-colors">
                   24/7 Help Desk & FAQ
                 </a>
               </li>
@@ -183,7 +183,7 @@ export const Footer = () => {
                 </a>
               </li>
               <li>
-                <a href="#corporate" onClick={(e) => { e.preventDefault(); alert("For private hall rentals, corporate screenings and school packages, contact corporate@cinepass.com"); }} className="hover:text-white transition-colors">
+                <a href="#corporate" onClick={(e) => { e.preventDefault(); alert("For private hall rentals, corporate screenings and school packages, contact corporate@tickettotal.in"); }} className="hover:text-white transition-colors">
                   Private Hall Rentals
                 </a>
               </li>
@@ -228,7 +228,7 @@ export const Footer = () => {
           <div className="flex items-center gap-4">
             <span className="text-neutral-400 flex items-center gap-1.5 text-xs">
               <MapPin className="w-3.5 h-3.5 text-[#f5a623]"/>
-              Kuala Lumpur, Malaysia
+              Belagavi, Karnataka, India
             </span>
             <button onClick={scrollToTop} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 transition-colors cursor-pointer" title="Scroll to Top">
               <ArrowUp className="w-4 h-4"/>

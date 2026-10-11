@@ -1,22 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Tag, 
-  X, 
-  AlertCircle, 
-  CheckCircle2, 
-  Coins, 
-  Sparkles, 
-  Film, 
-  Tv2, 
-  Clock, 
-  Calendar, 
-  ArrowUpDown, 
-  Percent, 
-  Layers, 
-  Check,
-  TrendingUp,
-  TrendingDown
-} from 'lucide-react';
+import {  
+  Tag, X, AlertCircle, CheckCircle2, Coins, Film, Layers, Check, TrendingUp, TrendingDown
+ } from 'lucide-react';
 import { api } from '../../services/api.service';
 
 export const EditPricingModal = ({ 
@@ -27,8 +12,6 @@ export const EditPricingModal = ({
   scheduledShowsCount = 1,
   onSuccess 
 }) => {
-  if (!isOpen) return null;
-
   const targetMovie = show?.movie || movie || {};
   const currentPricing = (show && typeof show.baseTierPricing === 'object' && show.baseTierPricing !== null)
     ? show.baseTierPricing
@@ -52,6 +35,11 @@ export const EditPricingModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Every hook must run before any early return. Returning `null` above the
+  // useState calls made closing the modal throw "Rendered fewer hooks than
+  // expected", which unmounted the whole Manager console.
+  if (!isOpen) return null;
 
   // Quick Multipliers (+10%, -10%, etc.)
   const applyMultiplier = (factor) => {
