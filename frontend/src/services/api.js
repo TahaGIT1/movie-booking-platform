@@ -861,17 +861,24 @@ export const api = {
 
 
   // Events, Streams, Plays, Sports, Activities
-  async getEvents() {
+  async getEvents({ city, category, search, page, size } = {}) {
     try {
-      const res = await fetch(`${API_BASE_URL}/events`);
+      const params = new URLSearchParams();
+      if (city) params.set('city', city);
+      if (category) params.set('category', category);
+      if (search) params.set('search', search);
+      if (page) params.set('page', page);
+      if (size) params.set('size', size);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/events${queryStr}`);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
+        return list;
       }
-      return DEFAULT_FALLBACK_EVENTS;
+      return [];
     } catch {
-      return DEFAULT_FALLBACK_EVENTS;
+      return [];
     }
   },
 
