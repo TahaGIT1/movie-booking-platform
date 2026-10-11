@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { authenticate, optionalAuthenticate } from '../../middleware/auth.middleware.js';
 import { requirePermission } from '../../middleware/permission.middleware.js';
 import { enforceTenantScope } from '../../middleware/tenant.middleware.js';
@@ -167,7 +168,8 @@ router.post('/', optionalAuthenticate, async (req, res, next) => {
             amountCents,
             paymentMethod: 'MOCK_CARD',
             status: 'SUCCESS',
-            paymentReference: 'PAY-' + bookingReference
+            idempotencyKey: crypto.randomUUID(),
+            gatewayTransactionId: 'PAY-' + bookingReference
           }
         });
 
@@ -484,7 +486,8 @@ router.post('/:id/mock-payment', authenticate, requirePermission(['BOOK_TICKETS'
             amountCents: booking.totalAmountCents,
             paymentMethod: 'MOCK_CARD',
             status: 'SUCCESS',
-            paymentReference: 'PAY-' + Math.floor(10000000 + Math.random() * 90000000)
+            idempotencyKey: crypto.randomUUID(),
+            gatewayTransactionId: 'PAY-' + (booking.bookingReference || bookingId) + '-' + Date.now()
           }
         });
 
