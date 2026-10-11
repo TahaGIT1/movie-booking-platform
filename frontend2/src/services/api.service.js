@@ -568,6 +568,27 @@ export const api = {
     return data;
   },
 
+  verifyBookingPayment: async (bookingId, paymentResponse) => {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/verify-payment`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(paymentResponse)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.message || 'Payment verification failed');
+    return data;
+  },
+
+  abandonBooking: async (bookingId) => {
+    const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/abandon`, {
+      method: 'POST',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || data.message || 'Could not release booking hold');
+    return data;
+  },
+
   getBookingById: async (bookingId) => {
     const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}`, { headers: getHeaders() });
     const data = await res.json();

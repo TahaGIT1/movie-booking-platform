@@ -14,6 +14,9 @@ const envSchema = z.object({
   SMTP_HOST: z.string().optional().default('smtp.gmail.com'),
   SMTP_PORT: z.string().optional().default('465'),
   SMTP_SECURE: z.string().optional().default('true'),
+  RAZORPAY_KEY_ID: z.string().optional().default('rzp_test_dummykey12345'),
+  RAZORPAY_KEY_SECRET: z.string().optional().default('dummysecret123456789'),
+  TICKET_QR_SECRET: z.string().optional().default('cineverse_ticket_qr_secret_super_secure_key'),
 });
 
 const _env = envSchema.safeParse(process.env);

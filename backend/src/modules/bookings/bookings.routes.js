@@ -6,6 +6,13 @@ import { prisma } from '../../config/prisma.js';
 import { io } from '../../socket.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import crypto from 'crypto';
+import { 
+  createRazorpayOrder, 
+  verifyCheckoutSignature, 
+  fetchRazorpayPayment, 
+  captureRazorpayPayment, 
+  paymentQrToken 
+} from './razorpay.js';
 
 const router = Router();
 
@@ -94,7 +101,18 @@ router.post('/initiate', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']),
 
     const bookingReference = 'CV' + Math.floor(10000000 + Math.random() * 90000000);
 
-    const booking = await prisma.$transaction(async (tx) => {
+    let razorpayOrder = null;
+    try {
+      razorpayOrder = await createRazorpayOrder({
+        amountPaise: Math.round(calculatedSubtotal * 100),
+        receipt: bookingReference,
+        notes: { showId, userId }
+      });
+    } catch (orderErr) {
+      console.warn('Razorpay order creation error:', orderErr.message);
+    }
+
+    let booking = await prisma.$transaction(async (tx) => {
       const b = await tx.booking.create({
         data: {
           bookingReference,
@@ -109,10 +127,221 @@ router.post('/initiate', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']),
         },
         include: { seats: true }
       });
+
+      if (razorpayOrder) {
+        await tx.payment.create({
+          data: {
+            bookingId: b.id,
+            gatewayName: 'RAZORPAY',
+            gatewayOrderId: razorpayOrder.order.id,
+            amountCents: calculatedSubtotal,
+            currency: 'INR',
+            paymentMethod: 'RAZORPAY',
+            status: 'INITIATED',
+            idempotencyKey: crypto.randomUUID()
+          }
+        });
+      }
+
       return b;
     });
 
+    if (razorpayOrder) {
+      booking = {
+        ...booking,
+        razorpay: {
+          keyId: razorpayOrder.keyId,
+          orderId: razorpayOrder.order.id,
+          amount: razorpayOrder.order.amount,
+          currency: razorpayOrder.order.currency || 'INR',
+          isDummy: razorpayOrder.isDummy
+        }
+      };
+    }
+
     res.status(201).json({ success: true, data: booking });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/verify-payment', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']), async (req, res, next) => {
+  try {
+    const bookingId = req.params.id;
+    const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body;
+    const userId = req.user.id;
+    const now = new Date();
+
+    const booking = await prisma.booking.findUnique({ 
+      where: { id: bookingId },
+      include: { seats: true }
+    });
+
+    if (!booking) throw new AppError(404, 'Booking not found');
+    if (booking.userId !== userId) throw new AppError(403, 'Unauthorized');
+    if (booking.status === 'CONFIRMED') {
+      return res.json({ 
+        success: true, 
+        message: 'Payment already verified', 
+        data: { 
+          bookingId, 
+          bookingReference: booking.bookingReference, 
+          qrText: JSON.stringify({ bookingId, bookingReference: booking.bookingReference, token: booking.qrPayloadHash }) 
+        } 
+      });
+    }
+    if (booking.status !== 'INITIATED') throw new AppError(400, 'Booking is already processed');
+
+    // Verify signature
+    const isValidSig = verifyCheckoutSignature({ orderId, paymentId, signature });
+    if (!isValidSig) {
+      throw new AppError(400, 'Payment signature verification failed', 'PAYMENT_SIGNATURE_INVALID');
+    }
+
+    const payment = await prisma.payment.findFirst({ 
+      where: { bookingId, gatewayName: 'RAZORPAY' } 
+    });
+
+    // Check payment capture
+    let gatewayPayment = await fetchRazorpayPayment(paymentId, orderId, booking.totalAmountCents);
+    if (gatewayPayment.status === 'authorized') {
+      gatewayPayment = await captureRazorpayPayment({ paymentId, amountPaise: booking.totalAmountCents, currency: 'INR' });
+    }
+    if (gatewayPayment.status !== 'captured' && gatewayPayment.status !== 'authorized') {
+      throw new AppError(402, 'Razorpay has not confirmed payment capture', 'PAYMENT_NOT_CAPTURED');
+    }
+
+    const qrHash = paymentQrToken(bookingId);
+
+    await prisma.$transaction(async (tx) => {
+      const sortedSeatIds = booking.seats.map(s => s.seatId).sort();
+      
+      for (const seatId of sortedSeatIds) {
+        const rows = await tx.$queryRaw`
+          SELECT id, status, locked_by_user_id, lock_expires_at 
+          FROM show_seat_status 
+          WHERE show_id = ${booking.showId}::uuid AND seat_id = ${seatId}::uuid 
+          FOR UPDATE
+        `;
+        
+        if (rows.length === 0) throw new AppError(404, 'Seat not found');
+        
+        const seatStatus = rows[0];
+        
+        const isHeldByMe = seatStatus.locked_by_user_id === userId && 
+                           seatStatus.lock_expires_at && 
+                           new Date(seatStatus.lock_expires_at) > now;
+                           
+        if (!isHeldByMe) {
+          throw new AppError(400, 'Seat hold expired before payment could complete', 'HOLD_EXPIRED');
+        }
+
+        if (seatStatus.status !== 'AVAILABLE') {
+          throw new AppError(409, 'Seat is no longer available', 'SEAT_UNAVAILABLE');
+        }
+
+        // Mark as booked
+        await tx.$queryRaw`
+          UPDATE show_seat_status
+          SET status = 'BOOKED', locked_by_user_id = NULL, lock_expires_at = NULL
+          WHERE id = ${seatStatus.id}::uuid
+        `;
+      }
+
+      if (payment) {
+        await tx.payment.update({ 
+          where: { id: payment.id }, 
+          data: { 
+            status: 'SUCCESS', 
+            gatewayTransactionId: paymentId, 
+            gatewayOrderId: orderId,
+            gatewayResponse: { orderId, paymentId, signature } 
+          } 
+        });
+      } else {
+        await tx.payment.create({
+          data: {
+            bookingId,
+            gatewayName: 'RAZORPAY',
+            gatewayOrderId: orderId,
+            gatewayTransactionId: paymentId,
+            amountCents: booking.totalAmountCents,
+            currency: 'INR',
+            paymentMethod: 'RAZORPAY',
+            status: 'SUCCESS',
+            idempotencyKey: crypto.randomUUID(),
+            gatewayResponse: { orderId, paymentId, signature }
+          }
+        });
+      }
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { status: 'CONFIRMED', qrPayloadHash: qrHash }
+      });
+
+      // Notification
+      await tx.notification.create({
+        data: {
+          userId,
+          type: 'BOOKING_CONFIRMED',
+          title: 'Tickets Confirmed via Razorpay!',
+          body: `Payment verified. Your booking reference is ${booking.bookingReference}.`,
+          relatedEntity: 'Booking',
+          relatedId: bookingId
+        }
+      });
+    });
+
+    // Broadcast updates
+    for (const bs of booking.seats) {
+      io.to(`show:${booking.showId}`).emit('seat:booked', { seatId: bs.seatId, userId });
+    }
+
+    const confirmed = await prisma.booking.findUnique({ 
+      where: { id: bookingId }, 
+      select: { bookingReference: true, qrPayloadHash: true } 
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Payment verified, tickets confirmed', 
+      data: { 
+        bookingId, 
+        bookingReference: confirmed.bookingReference, 
+        qrText: JSON.stringify({ bookingId, bookingReference: confirmed.bookingReference, token: confirmed.qrPayloadHash }) 
+      } 
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/abandon', requirePermission(['BOOK_TICKETS', 'MANAGE_BOOKINGS']), async (req, res, next) => {
+  try {
+    const booking = await prisma.booking.findUnique({ 
+      where: { id: req.params.id }, 
+      include: { seats: true, payments: true } 
+    });
+    if (!booking) throw new AppError(404, 'Booking not found');
+    if (booking.userId !== req.user.id) throw new AppError(403, 'Unauthorized');
+    if (booking.status !== 'INITIATED') return res.json({ success: true, data: { status: booking.status } });
+    if (booking.payments.some((payment) => payment.status === 'SUCCESS')) {
+      throw new AppError(409, 'A successful payment cannot be abandoned');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.update({ where: { id: booking.id }, data: { status: 'EXPIRED' } });
+      await tx.payment.updateMany({ 
+        where: { bookingId: booking.id, status: 'INITIATED' }, 
+        data: { status: 'CANCELLED' } 
+      });
+      for (const { seatId } of booking.seats) {
+        await tx.showSeatStatus.updateMany({ 
+          where: { showId: booking.showId, seatId, lockedByUserId: req.user.id }, 
+          data: { lockedByUserId: null, lockExpiresAt: null } 
+        });
+        io.to(`show:${booking.showId}`).emit('seat:released', { seatId });
+      }
+    });
+
+    res.json({ success: true, message: 'Booking hold released' });
   } catch (err) { next(err); }
 });
 
