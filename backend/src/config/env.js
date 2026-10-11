@@ -9,6 +9,11 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().default('postgresql://postgres:postgres@localhost:5432/cineverse'),
   JWT_SECRET: z.string().min(16).default('cineverse_jwt_secret_dev_key_12345'),
   JWT_REFRESH_SECRET: z.string().min(16).default('cineverse_jwt_refresh_dev_key_67890'),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_HOST: z.string().optional().default('smtp.gmail.com'),
+  SMTP_PORT: z.string().optional().default('465'),
+  SMTP_SECURE: z.string().optional().default('true'),
 });
 
 const _env = envSchema.safeParse(process.env);
