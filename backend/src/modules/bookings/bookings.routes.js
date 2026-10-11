@@ -487,6 +487,18 @@ router.post('/:id/mock-payment', authenticate, requirePermission(['BOOK_TICKETS'
             paymentReference: 'PAY-' + Math.floor(10000000 + Math.random() * 90000000)
           }
         });
+
+        // Create in-app notification for the customer
+        await tx.notification.create({
+          data: {
+            userId,
+            type: 'BOOKING_CONFIRMED',
+            title: 'Tickets Confirmed!',
+            body: `Your booking (${booking.bookingReference}) has been confirmed successfully.`,
+            relatedEntity: 'Booking',
+            relatedId: bookingId
+          }
+        });
       });
 
       for (const bs of booking.seats) {
@@ -531,6 +543,27 @@ router.post('/:id/mock-payment', authenticate, requirePermission(['BOOK_TICKETS'
   } catch (err) { next(err); }
 });
 
+// Get booking by ID
+router.get('/:id', authenticate, async (req, res, next) => {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.id },
+      include: {
+        show: { include: { movie: true, screen: true, theatre: true } },
+        seats: { include: { seat: true } },
+        payments: true
+      }
+    });
+
+    if (!booking) throw new AppError(404, 'Booking not found');
+    if (req.user.role === 'CUSTOMER' && booking.userId !== req.user.id) {
+      throw new AppError(403, 'Unauthorized access to this booking');
+    }
+
+    res.json({ success: true, data: booking });
+  } catch (err) { next(err); }
+});
+
 // Customer: Cancel confirmed booking
 router.post('/:id/cancel', authenticate, async (req, res, next) => {
   try {
@@ -569,6 +602,18 @@ router.post('/:id/cancel', authenticate, async (req, res, next) => {
       await tx.booking.update({
         where: { id: bookingId },
         data: { status: 'CANCELLED' }
+      });
+
+      // Create cancellation notification
+      await tx.notification.create({
+        data: {
+          userId,
+          type: 'BOOKING_CANCELLED',
+          title: 'Booking Cancelled',
+          body: `Your booking (${booking.bookingReference}) has been cancelled and refund initiated.`,
+          relatedEntity: 'Booking',
+          relatedId: bookingId
+        }
       });
     });
 

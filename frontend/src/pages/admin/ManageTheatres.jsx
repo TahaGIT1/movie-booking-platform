@@ -18,7 +18,9 @@ import {
   Sparkles,
   ShieldCheck,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { api } from '../../services/api.service';
 
@@ -31,6 +33,11 @@ export const ManageTheatres = () => {
   // Detailed Theatre Modal State
   const [selectedTheatre, setSelectedTheatre] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+
+  // Delete Theatre State
+  const [theatreToDelete, setTheatreToDelete] = useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Add Theatre Form State
   const [showAddForm, setShowAddForm] = useState(false);
@@ -120,6 +127,46 @@ export const ManageTheatres = () => {
   const openDetails = (theatre) => {
     setSelectedTheatre(theatre);
     setDetailModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!theatreToDelete) return;
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setAlertMsg({
+        type: 'error',
+        text: 'Authentication required (401): You are not signed in. Please sign in with an administrator account to delete theatres.'
+      });
+      return;
+    }
+
+    setDeleteLoading(true);
+    try {
+      await api.deleteAdminTheatre(theatreToDelete.id);
+      setAlertMsg({
+        type: 'success',
+        text: `Theatre "${theatreToDelete.name}" and all associated records cleared successfully.`
+      });
+      setDeleteModalOpen(false);
+      if (detailModalOpen && selectedTheatre?.id === theatreToDelete.id) {
+        setDetailModalOpen(false);
+        setSelectedTheatre(null);
+      }
+      setTheatreToDelete(null);
+      await fetchTheatres();
+    } catch (err) {
+      console.error('Failed to delete theatre:', err);
+      const isAuthErr = err.message?.includes('401') || err.message?.includes('Authentication');
+      setAlertMsg({
+        type: 'error',
+        text: isAuthErr 
+          ? 'Admin authorization failed (401): Your session has expired or lacks administrator permissions. Please sign in again.'
+          : (err.message || 'Failed to delete theatre and its associated data.')
+      });
+    } finally {
+      setDeleteLoading(false);
+      setTimeout(() => setAlertMsg(null), 6000);
+    }
   };
 
   // Unique cities for filter
@@ -484,16 +531,31 @@ export const ManageTheatres = () => {
 
                       {/* Actions */}
                       <td className="py-4 px-6 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDetails(theatre);
-                          }}
-                          className="px-3.5 py-1.5 rounded-xl border border-white/10 hover:border-yellow-500/50 bg-white/5 hover:bg-yellow-500/10 text-neutral-300 hover:text-yellow-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Eye size={13} />
-                          View Details
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDetails(theatre);
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl border border-white/10 hover:border-yellow-500/50 bg-white/5 hover:bg-yellow-500/10 text-neutral-300 hover:text-yellow-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Eye size={13} />
+                            View Details
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTheatreToDelete(theatre);
+                              setDeleteModalOpen(true);
+                            }}
+                            title="Delete Theatre & Clear Associated Data"
+                            className="px-3.5 py-1.5 rounded-xl border border-red-500/20 hover:border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Trash2 size={13} />
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -638,10 +700,18 @@ export const ManageTheatres = () => {
               </div>
 
               {/* Modal Footer */}
-              <div className="pt-4 flex items-center justify-between border-t border-white/10">
-                <span className="text-xs text-neutral-500">
-                  Theatre status is verified and active for bookings.
-                </span>
+              <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheatreToDelete(selectedTheatre);
+                    setDeleteModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-bold transition inline-flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Trash2 size={14} />
+                  Delete Theatre & Clear Data
+                </button>
                 
                 <button
                   type="button"
@@ -652,6 +722,87 @@ export const ManageTheatres = () => {
                 </button>
               </div>
 
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* DELETE THEATRE CONFIRMATION MODAL */}
+      {deleteModalOpen && theatreToDelete && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-[#11131a] border border-red-500/30 rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-[0_0_50px_rgba(239,68,68,0.2)] relative animate-in zoom-in-95 duration-200 space-y-6">
+            
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+                <AlertTriangle size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-black text-white">Delete Theatre?</h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  This is a permanent, destructive action.
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  if (!deleteLoading) {
+                    setDeleteModalOpen(false);
+                    setTheatreToDelete(null);
+                  }
+                }}
+                className="text-neutral-500 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-red-950/20 border border-red-500/20 space-y-2.5 text-xs">
+              <div className="font-bold text-red-300 flex items-center gap-2">
+                <span>Target Theatre:</span>
+                <span className="text-white font-mono bg-white/10 px-2 py-0.5 rounded">{theatreToDelete.name}</span>
+              </div>
+              <p className="text-neutral-300 leading-relaxed">
+                Deleting this theatre will automatically cascade and <strong className="text-red-400">permanently clear all referring fields and records</strong>:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-neutral-400 text-[11px] pt-1">
+                <li>All screens, seating configurations, and seat tiers</li>
+                <li>All scheduled shows and seat availability statuses</li>
+                <li>All customer bookings, tickets, payments, refunds, and concessions</li>
+                <li>All custom coupons and verification documents</li>
+                <li>All assigned theatre manager and staff accounts (permanently removed from users)</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setTheatreToDelete(null);
+                }}
+                className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 text-xs font-semibold transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={handleConfirmDelete}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition inline-flex items-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.3)] disabled:opacity-50 cursor-pointer"
+              >
+                {deleteLoading ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Clearing Data & Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    Confirm & Delete All Data
+                  </>
+                )}
+              </button>
             </div>
 
           </div>

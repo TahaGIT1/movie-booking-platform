@@ -14,6 +14,7 @@ import catalogRoutes from '../modules/catalog/catalog.routes.js';
 import { prisma } from '../config/prisma.js';
 import { tmdbService } from '../services/tmdb.service.js';
 import { ticketmasterService } from '../services/ticketmaster.service.js';
+import notificationRoutes from '../modules/notifications/notifications.routes.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use('/auth', authRoutes);
 router.use('/admin/movies', adminMovieRoutes);
 router.use('/admin/theatres', adminTheatreRoutes);
 router.use('/movies', movieRoutes);
+router.use('/notifications', notificationRoutes);
 
 // Manager portal scoped routes & Customer routes
 router.use('/manager/theatre', theatreRoutes);

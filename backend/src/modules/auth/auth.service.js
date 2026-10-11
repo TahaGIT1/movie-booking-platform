@@ -5,8 +5,8 @@ import { prisma } from '../../config/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
 
 const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ userId }, env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+  const accessToken = jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: '7d' });
+  const refreshToken = jwt.sign({ userId }, env.JWT_REFRESH_SECRET, { expiresIn: '30d' });
   return { accessToken, refreshToken };
 };
 

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, optionalAuthenticate } from '../../middleware/auth.middleware.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 import { requirePermission } from '../../middleware/permission.middleware.js';
 import { enforceTenantScope } from '../../middleware/tenant.middleware.js';
 import { validateRequest } from '../../middleware/validation.middleware.js';
@@ -10,16 +10,42 @@ import { io } from '../../socket.js';
 
 const router = Router();
 
+// Public: Query shows by movie, city, or date
+router.get('/public', async (req, res, next) => {
+  try {
+    const { movieId, city, date } = req.query;
+    const where = { isCancelled: false };
+    if (movieId) where.movieId = movieId;
+    if (city && city !== 'All Cities' && city !== 'All') {
+      where.theatre = { city: { equals: city, mode: 'insensitive' } };
+    }
+    if (date) {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      where.startTime = { gte: startOfDay, lte: endOfDay };
+    } else {
+      where.startTime = { gte: new Date() };
+    }
+
+    const shows = await prisma.show.findMany({
+      where,
+      include: {
+        movie: true,
+        theatre: true,
+        screen: true
+      },
+      orderBy: { startTime: 'asc' }
+    });
+    res.json({ success: true, data: shows });
+  } catch (err) { next(err); }
+});
+
 // Public: Get seats & their real-time hold status for a show
 router.get('/:id/seats', async (req, res, next) => {
   try {
-    let showId = req.params.id;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(showId);
-    if (!isUuid) {
-      const fallbackShow = await prisma.show.findFirst();
-      if (fallbackShow) showId = fallbackShow.id;
-    }
-
+    const showId = req.params.id;
     const seats = await prisma.showSeatStatus.findMany({
       where: { showId },
       include: { seat: true }
@@ -38,85 +64,211 @@ router.get('/:id/seats', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/seats/lock', optionalAuthenticate, async (req, res, next) => {
+// Public: Get single show details by ID (with screen, movie, theatre)
+router.get('/:id', async (req, res, next) => {
   try {
-    let showId = req.params.id;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(showId);
-    if (!isUuid) {
-      const fallbackShow = await prisma.show.findFirst();
-      if (fallbackShow) showId = fallbackShow.id;
-    }
-
-    let userId = req.user?.id;
-    if (!userId) {
-      const defaultUser = await prisma.user.findFirst({ where: { role: 'CUSTOMER' } });
-      userId = defaultUser?.id;
-    }
-
-    const { seatIds = [] } = req.body;
-    const now = new Date();
-    const expiryTime = new Date(now.getTime() + 300 * 1000); // 5 minutes from now
-
-    // Map any labels like 'E7' to actual seat UUIDs if applicable
-    const resolvedSeatIds = [];
-    for (const s of seatIds) {
-      const isSeatUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-      if (isSeatUuid) {
-        resolvedSeatIds.push(s);
-      } else {
-        const match = s.match(/^([A-Za-z]+)(\d+)$/);
-        if (match) {
-          const rowLabel = match[1].toUpperCase();
-          const seatNum = parseInt(match[2], 10);
-          const found = await prisma.seat.findFirst({
-            where: {
-              rowLabel,
-              seatNumber: seatNum,
-              screen: { shows: { some: { id: showId } } }
+    const show = await prisma.show.findUnique({
+      where: { id: req.params.id },
+      include: {
+        movie: true,
+        theatre: true,
+        screen: {
+          include: {
+            seats: {
+              orderBy: [{ rowLabel: 'asc' }, { seatNumber: 'asc' }]
             }
-          });
-          if (found) resolvedSeatIds.push(found.id);
+          }
         }
+      }
+    });
+    if (!show) throw new AppError(404, 'Show session not found');
+    res.json({ success: true, data: show });
+  } catch (err) { next(err); }
+});
+
+// Get user's active seat hold if any (across any show/theatre)
+router.get('/my-active-hold', authenticate, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const now = new Date();
+
+    const activeHolds = await prisma.showSeatStatus.findMany({
+      where: {
+        lockedByUserId: userId,
+        lockExpiresAt: { gt: now }
+      },
+      include: {
+        show: {
+          include: {
+            movie: { select: { id: true, title: true, posterUrl: true } },
+            theatre: { select: { id: true, name: true, city: true } }
+          }
+        },
+        seat: true
+      }
+    });
+
+    if (activeHolds.length === 0) {
+      return res.json({ success: true, data: { hasActiveHold: false } });
+    }
+
+    const first = activeHolds[0];
+    const show = first.show;
+    const lockExpiresAt = activeHolds.reduce(
+      (earliest, h) => (h.lockExpiresAt && (!earliest || h.lockExpiresAt < earliest) ? h.lockExpiresAt : earliest),
+      null
+    );
+
+    res.json({
+      success: true,
+      data: {
+        hasActiveHold: true,
+        showId: show.id,
+        movieId: show.movie?.id,
+        movieTitle: show.movie?.title,
+        theatreId: show.theatre?.id,
+        theatreName: show.theatre?.name,
+        city: show.theatre?.city,
+        seatIds: activeHolds.map((h) => h.seatId),
+        seatLabels: activeHolds.map((h) => `${h.seat?.rowLabel}${h.seat?.seatNumber}`),
+        lockExpiresAt
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Release all active seat holds held by the authenticated user across all shows/theatres
+router.post('/release-all-holds', authenticate, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const now = new Date();
+
+    const activeHolds = await prisma.showSeatStatus.findMany({
+      where: {
+        lockedByUserId: userId,
+        lockExpiresAt: { gt: now }
+      },
+      select: { id: true, showId: true, seatId: true }
+    });
+
+    if (activeHolds.length > 0) {
+      await prisma.showSeatStatus.updateMany({
+        where: {
+          id: { in: activeHolds.map((h) => h.id) }
+        },
+        data: {
+          lockedByUserId: null,
+          lockExpiresAt: null
+        }
+      });
+
+      for (const hold of activeHolds) {
+        io.to(`show:${hold.showId}`).emit('seat:released', { seatId: hold.seatId });
       }
     }
 
-    if (userId && resolvedSeatIds.length > 0) {
-      await prisma.$transaction(async (tx) => {
-        const sortedSeatIds = [...resolvedSeatIds].sort();
+    res.json({
+      success: true,
+      message: 'All active seat holds released successfully',
+      releasedCount: activeHolds.length
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
-        for (const seatId of sortedSeatIds) {
-          const rows = await tx.$queryRaw`
-            SELECT id, status, locked_by_user_id, lock_expires_at 
-            FROM show_seat_status 
-            WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid 
-            FOR UPDATE
-          `;
+router.post('/:id/seats/lock', authenticate, requirePermission('BOOK_TICKETS'), async (req, res, next) => {
+  try {
+    const showId = req.params.id;
+    const { seatIds } = req.body;
+    const userId = req.user.id;
+    const now = new Date();
+    const expiryTime = new Date(now.getTime() + 300 * 1000); // 5 minutes from now
 
-          if (rows.length === 0) continue;
+    // 1. Enforce seat count validation (1 to 6 seats)
+    if (!Array.isArray(seatIds) || seatIds.length === 0) {
+      throw new AppError(400, 'Please select at least one seat', 'NO_SEATS_SELECTED');
+    }
 
-          const seatStatus = rows[0];
+    if (seatIds.length > 6) {
+      throw new AppError(400, 'You can select a maximum of 6 seats at a single time', 'MAX_SEATS_EXCEEDED');
+    }
 
-          if (seatStatus.status !== 'AVAILABLE') {
-            throw new AppError(409, 'Seat is not available', 'SEAT_UNAVAILABLE', { seatId });
+    await prisma.$transaction(async (tx) => {
+      // 2. Enforce cross-show / cross-theatre lock restriction:
+      // If user holds seats on another show or theatre, block holding seats on this show
+      const activeOtherHolds = await tx.showSeatStatus.findMany({
+        where: {
+          lockedByUserId: userId,
+          lockExpiresAt: { gt: now },
+          showId: { not: showId }
+        },
+        include: {
+          show: {
+            include: {
+              movie: { select: { title: true } },
+              theatre: { select: { name: true, city: true } }
+            }
           }
-
-          const isHeldByOther = seatStatus.locked_by_user_id && 
-                                seatStatus.locked_by_user_id !== userId && 
-                                seatStatus.lock_expires_at && 
-                                new Date(seatStatus.lock_expires_at) > now;
-
-          if (isHeldByOther) {
-            throw new AppError(409, 'Seat already locked', 'SEAT_LOCKED', { seatId });
-          }
-
-          await tx.$queryRaw`
-            UPDATE show_seat_status
-            SET locked_by_user_id = ${userId}::uuid, lock_expires_at = ${expiryTime}
-            WHERE id = ${seatStatus.id}::uuid
-          `;
         }
       });
-    }
+
+      if (activeOtherHolds.length > 0) {
+        const otherShow = activeOtherHolds[0].show;
+        const otherMovieTitle = otherShow?.movie?.title || 'Another Movie';
+        const otherTheatreName = otherShow?.theatre?.name || 'Another Cinema';
+
+        throw new AppError(
+          409,
+          `You currently have seats on hold for "${otherMovieTitle}" at ${otherTheatreName}. You cannot select seats on another show or theatre while holding seats. Please complete or release that booking first.`,
+          'ACTIVE_HOLD_ON_ANOTHER_SHOW',
+          {
+            otherShowId: otherShow?.id,
+            otherMovie: otherMovieTitle,
+            otherTheatre: otherTheatreName
+          }
+        );
+      }
+
+      // 3. Acquire row-level locks on requested seats
+      const sortedSeatIds = [...seatIds].sort();
+
+      for (const seatId of sortedSeatIds) {
+        const rows = await tx.$queryRaw`
+          SELECT id, status, locked_by_user_id, lock_expires_at 
+          FROM show_seat_status 
+          WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid 
+          FOR UPDATE
+        `;
+
+        if (rows.length === 0) {
+          throw new AppError(404, 'Seat not found in show');
+        }
+
+        const seatStatus = rows[0];
+
+        if (seatStatus.status !== 'AVAILABLE') {
+          throw new AppError(409, 'Seat is not available', 'SEAT_UNAVAILABLE', { seatId });
+        }
+
+        const isHeldByOther = seatStatus.locked_by_user_id && 
+                              seatStatus.locked_by_user_id !== userId && 
+                              seatStatus.lock_expires_at && 
+                              new Date(seatStatus.lock_expires_at) > now;
+
+        if (isHeldByOther) {
+          throw new AppError(409, 'Seat already locked by another customer', 'SEAT_LOCKED', { seatId });
+        }
+
+        await tx.$queryRaw`
+          UPDATE show_seat_status
+          SET locked_by_user_id = ${userId}::uuid, lock_expires_at = ${expiryTime}
+          WHERE id = ${seatStatus.id}::uuid
+        `;
+      }
+    });
 
     for (const seatId of seatIds) {
       io.to(`show:${showId}`).emit('seat:locked', { seatId, userId, lockExpiresAt: expiryTime });
@@ -126,67 +278,38 @@ router.post('/:id/seats/lock', optionalAuthenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/seats/release', optionalAuthenticate, async (req, res, next) => {
+router.post('/:id/seats/release', authenticate, requirePermission('BOOK_TICKETS'), async (req, res, next) => {
   try {
-    let showId = req.params.id;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(showId);
-    if (!isUuid) {
-      const fallbackShow = await prisma.show.findFirst();
-      if (fallbackShow) showId = fallbackShow.id;
-    }
+    const showId = req.params.id;
+    const { seatIds } = req.body;
+    const userId = req.user.id;
 
-    const { seatIds = [] } = req.body;
-    const userId = req.user?.id;
+    await prisma.$transaction(async (tx) => {
+      const sortedSeatIds = [...seatIds].sort();
 
-    // Resolve labels to UUIDs if needed
-    const resolvedSeatIds = [];
-    for (const s of seatIds) {
-      const isSeatUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-      if (isSeatUuid) {
-        resolvedSeatIds.push(s);
-      } else {
-        const match = s.match(/^([A-Za-z]+)(\d+)$/);
-        if (match) {
-          const rowLabel = match[1].toUpperCase();
-          const seatNum = parseInt(match[2], 10);
-          const found = await prisma.seat.findFirst({
-            where: {
-              rowLabel,
-              seatNumber: seatNum,
-              screen: { shows: { some: { id: showId } } }
-            }
-          });
-          if (found) resolvedSeatIds.push(found.id);
+      for (const seatId of sortedSeatIds) {
+        const rows = await tx.$queryRaw`
+          SELECT id, locked_by_user_id 
+          FROM show_seat_status 
+          WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid 
+          FOR UPDATE
+        `;
+
+        if (rows.length === 0) continue;
+
+        const seatStatus = rows[0];
+
+        if (seatStatus.locked_by_user_id === userId) {
+          await tx.$queryRaw`
+            UPDATE show_seat_status
+            SET locked_by_user_id = NULL, lock_expires_at = NULL
+            WHERE id = ${seatStatus.id}::uuid
+          `;
+        } else {
+          throw new AppError(403, 'You do not own the hold for this seat');
         }
       }
-    }
-
-    if (userId && resolvedSeatIds.length > 0) {
-      await prisma.$transaction(async (tx) => {
-        const sortedSeatIds = [...resolvedSeatIds].sort();
-
-        for (const seatId of sortedSeatIds) {
-          const rows = await tx.$queryRaw`
-            SELECT id, locked_by_user_id 
-            FROM show_seat_status 
-            WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid 
-            FOR UPDATE
-          `;
-
-          if (rows.length === 0) continue;
-
-          const seatStatus = rows[0];
-
-          if (!seatStatus.locked_by_user_id || seatStatus.locked_by_user_id === userId) {
-            await tx.$queryRaw`
-              UPDATE show_seat_status
-              SET locked_by_user_id = NULL, lock_expires_at = NULL
-              WHERE id = ${seatStatus.id}::uuid
-            `;
-          }
-        }
-      });
-    }
+    });
 
     for (const seatId of seatIds) {
       io.to(`show:${showId}`).emit('seat:released', { seatId });
@@ -195,7 +318,6 @@ router.post('/:id/seats/release', optionalAuthenticate, async (req, res, next) =
     res.json({ success: true, message: 'Seats released' });
   } catch (err) { next(err); }
 });
-
 
 // Manager route: List shows for manager's theatre
 router.get('/', authenticate, requirePermission(['MANAGE_SHOWS', 'CREATE_SHOW']), enforceTenantScope, async (req, res, next) => {

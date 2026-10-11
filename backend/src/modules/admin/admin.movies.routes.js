@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { requirePermission } from '../../middleware/permission.middleware.js';
 import { validateRequest } from '../../middleware/validation.middleware.js';
-import { createMovieSchema } from '../movies/movies.schema.js';
+import { createMovieSchema, updateMovieSchema } from '../movies/movies.schema.js';
 import { prisma } from '../../config/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
 
@@ -121,7 +121,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // Update movie
-router.put('/:id', validateRequest(createMovieSchema.partial()), async (req, res, next) => {
+router.put('/:id', validateRequest(updateMovieSchema), async (req, res, next) => {
   try {
     const data = sanitizeMoviePayload(req.body);
     const movie = await prisma.movie.update({
@@ -134,11 +134,10 @@ router.put('/:id', validateRequest(createMovieSchema.partial()), async (req, res
   }
 });
 
-// Delete movie
+// Delete movie with cascading cleanup
 router.delete('/:id', async (req, res, next) => {
   try {
     const movieId = req.params.id;
-    // Remove any related shows and statuses first to prevent foreign key errors
     await prisma.showSeatStatus.deleteMany({
       where: { show: { movieId } }
     });

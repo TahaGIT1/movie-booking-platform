@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../config/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 import { tmdbService, formatTmdbMovie } from '../../services/tmdb.service.js';
 
 const router = Router();
@@ -75,7 +76,7 @@ router.get('/search', async (req, res, next) => {
     ]);
 
     // Format DB matches to match movie item shape
-    const formattedDbMovies = dbMovies.map((dbM, idx) => ({
+    const formattedDbMovies = dbMovies.map((dbM) => ({
       id: dbM.id,
       dbMovieId: dbM.id,
       title: dbM.title,
@@ -125,7 +126,21 @@ router.get('/search', async (req, res, next) => {
   }
 });
 
-// 6. Movie Trailers
+// 6. User's Watchlist
+router.get('/watchlist/my', authenticate, async (req, res, next) => {
+  try {
+    const list = await prisma.watchlist.findMany({
+      where: { userId: req.user.id },
+      include: { movie: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, data: list.map((item) => item.movie) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 7. Movie Trailers
 router.get('/:id/trailers', async (req, res, next) => {
   try {
     const tmdbId = parseInt(req.params.id, 10);
@@ -139,7 +154,7 @@ router.get('/:id/trailers', async (req, res, next) => {
   }
 });
 
-// 7. List movies (supports ?status=now_playing, ?status=upcoming, ?status=trending, ?status=popular)
+// 8. List movies (supports ?status=now_playing, ?status=upcoming, ?status=trending, ?status=popular)
 router.get('/', async (req, res, next) => {
   try {
     const { status, search, genre, source, page = 1 } = req.query;
@@ -172,7 +187,7 @@ router.get('/', async (req, res, next) => {
       return res.json({ success: true, ...data, data: data.movies });
     }
 
-    // Default: Now Playing from TMDB, combined with active DB movies that have live scheduled shows
+    // Default: Combine DB movies that have live scheduled shows with TMDB Now Playing
     const [nowPlayingData, activeDbMovies] = await Promise.all([
       tmdbService.getNowPlaying(parseInt(page, 10) || 1).catch(() => ({ movies: [] })),
       prisma.movie.findMany({
@@ -241,7 +256,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// 8. Get movie by ID (supports TMDB ID, DB UUID, or slug/title)
+// 9. Get movie by ID (supports TMDB ID, DB UUID, or slug/title)
 router.get('/:id', async (req, res, next) => {
   try {
     const param = req.params.id;
@@ -269,11 +284,17 @@ router.get('/:id', async (req, res, next) => {
             include: { theatre: true, screen: true },
             orderBy: { startTime: 'asc' },
           },
+          reviews: {
+            include: {
+              user: { select: { id: true, fullName: true } }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 10
+          }
         },
       });
 
       if (dbMovie) {
-        // Format DB movie for frontend
         const formatted = {
           id: dbMovie.id,
           dbMovieId: dbMovie.id,
@@ -299,6 +320,7 @@ router.get('/:id', async (req, res, next) => {
           rating: 4.8,
           hasLiveShows: Boolean(dbMovie.shows && dbMovie.shows.length > 0),
           shows: dbMovie.shows || [],
+          reviews: dbMovie.reviews || [],
           primaryAction: {
             label: dbMovie.shows?.length > 0 ? 'Book Seats' : 'Book Tickets',
             icon: 'ticket',
@@ -329,6 +351,13 @@ router.get('/:id', async (req, res, next) => {
           include: { theatre: true, screen: true },
           orderBy: { startTime: 'asc' },
         },
+        reviews: {
+          include: {
+            user: { select: { id: true, fullName: true } }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        }
       },
     });
 
@@ -353,6 +382,7 @@ router.get('/:id', async (req, res, next) => {
         rating: 4.8,
         hasLiveShows: Boolean(dbSearch.shows && dbSearch.shows.length > 0),
         shows: dbSearch.shows || [],
+        reviews: dbSearch.reviews || [],
         primaryAction: {
           label: dbSearch.shows?.length > 0 ? 'Book Seats' : 'Book Tickets',
           icon: 'ticket',
@@ -372,6 +402,141 @@ router.get('/:id', async (req, res, next) => {
     }
 
     throw new AppError(404, 'Movie not found', 'NOT_FOUND');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 10. Reviews for a movie
+router.get('/:id/reviews', async (req, res, next) => {
+  try {
+    const reviews = await prisma.review.findMany({
+      where: { movieId: req.params.id },
+      include: {
+        user: { select: { id: true, fullName: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const totalReviews = reviews.length;
+    const avgScore =
+      totalReviews > 0
+        ? Number((reviews.reduce((sum, r) => sum + r.ratingScore, 0) / totalReviews).toFixed(1))
+        : null;
+
+    res.json({
+      success: true,
+      data: {
+        reviews,
+        totalReviews,
+        averageRating: avgScore
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 11. Post / Edit Review
+router.post('/:id/reviews', authenticate, async (req, res, next) => {
+  try {
+    const { ratingScore, reviewText } = req.body;
+    const score = Number(ratingScore);
+    if (!score || score < 1 || score > 5) {
+      throw new AppError(400, 'Rating score must be between 1 and 5 stars', 'INVALID_RATING');
+    }
+
+    const review = await prisma.review.upsert({
+      where: {
+        userId_movieId: {
+          userId: req.user.id,
+          movieId: req.params.id
+        }
+      },
+      update: {
+        ratingScore: score,
+        reviewText: reviewText?.trim() || null
+      },
+      create: {
+        userId: req.user.id,
+        movieId: req.params.id,
+        ratingScore: score,
+        reviewText: reviewText?.trim() || null
+      },
+      include: {
+        user: { select: { id: true, fullName: true } }
+      }
+    });
+
+    res.json({ success: true, data: review, message: 'Review saved successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 12. Delete Review
+router.delete('/:id/reviews', authenticate, async (req, res, next) => {
+  try {
+    await prisma.review.deleteMany({
+      where: {
+        userId: req.user.id,
+        movieId: req.params.id
+      }
+    });
+    res.json({ success: true, message: 'Review deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 13. Check Watchlist status
+router.get('/:id/watchlist', authenticate, async (req, res, next) => {
+  try {
+    const entry = await prisma.watchlist.findUnique({
+      where: {
+        userId_movieId: {
+          userId: req.user.id,
+          movieId: req.params.id
+        }
+      }
+    });
+    res.json({ success: true, inWatchlist: Boolean(entry) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 14. Toggle Watchlist
+router.post('/:id/watchlist', authenticate, async (req, res, next) => {
+  try {
+    const existing = await prisma.watchlist.findUnique({
+      where: {
+        userId_movieId: {
+          userId: req.user.id,
+          movieId: req.params.id
+        }
+      }
+    });
+
+    if (existing) {
+      await prisma.watchlist.delete({
+        where: {
+          userId_movieId: {
+            userId: req.user.id,
+            movieId: req.params.id
+          }
+        }
+      });
+      res.json({ success: true, inWatchlist: false, message: 'Removed from watchlist' });
+    } else {
+      await prisma.watchlist.create({
+        data: {
+          userId: req.user.id,
+          movieId: req.params.id
+        }
+      });
+      res.json({ success: true, inWatchlist: true, message: 'Added to watchlist' });
+    }
   } catch (err) {
     next(err);
   }

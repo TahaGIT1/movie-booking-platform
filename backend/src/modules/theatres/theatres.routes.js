@@ -145,8 +145,8 @@ router.get('/my/analytics', authenticate, requirePermission(['VIEW_REPORTS', 'MA
 router.get('/', async (req, res, next) => {
   try {
     const { city } = req.query;
-    const where = { status: { in: ['ACTIVE', 'APPROVED'] } };
-    if (city && city !== 'All Cities') {
+    const where = { status: { in: ['APPROVED', 'ACTIVE'] } };
+    if (city && city !== 'All Cities' && city !== 'All') {
       where.city = { contains: city, mode: 'insensitive' };
     }
     const theatres = await prisma.theatre.findMany({
@@ -159,8 +159,13 @@ router.get('/', async (req, res, next) => {
               include: { movie: true }
             }
           }
+        },
+        shows: {
+          where: { isCancelled: false },
+          include: { movie: true }
         }
-      }
+      },
+      orderBy: { name: 'asc' }
     });
     res.json({ success: true, data: theatres });
   } catch (err) { next(err); }
