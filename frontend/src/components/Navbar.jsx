@@ -43,12 +43,11 @@ export const Navbar = ({ onOpenSearch }) => {
                 <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-10 h-18 sm:h-20 flex items-center justify-between">
                     {/* LEFT: Logo */}
                     <Link to="/" className="flex items-center gap-2 group select-none cursor-pointer">
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xl sm:text-2xl font-heading font-extrabold tracking-tight text-white group-hover:text-neutral-200 transition-colors">
-                                CineVerse
-                            </span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#f5a623] inline-block shadow-[0_0_8px_#f5a623]" />
-                        </div>
+                        <img 
+                            src="/ticket-total-logo.png" 
+                            alt="Ticket Total" 
+                            className="h-9 sm:h-11 md:h-12 w-auto object-contain drop-shadow-[0_4px_16px_rgba(255,255,255,0.14)] hover:scale-105 transition-transform duration-200" 
+                        />
                     </Link>
 
                     {/* CENTER: Navigation Links (Desktop) */}
@@ -204,10 +203,13 @@ export const Navbar = ({ onOpenSearch }) => {
                         <div>
                             {/* Header */}
                             <div className="flex items-center justify-between pb-6 border-b border-white/10">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xl font-heading font-extrabold text-white">CineVerse</span>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#f5a623]" />
-                                </div>
+                                <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center">
+                                    <img 
+                                        src="/ticket-total-logo.png" 
+                                        alt="Ticket Total" 
+                                        className="h-8 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,255,255,0.12)]" 
+                                    />
+                                </Link>
                                 <button
                                     onClick={() => setMobileMenuOpen(false)}
                                     className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"

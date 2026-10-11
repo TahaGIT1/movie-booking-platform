@@ -33,10 +33,10 @@ export const AdminLayout = () => {
       {/* Sidebar */}
       <div className="w-64 bg-black border-r border-white/10 flex flex-col z-10 shrink-0">
         <div className="p-6 border-b border-white/10">
-          <Link to="/" className="text-2xl font-bold tracking-tighter">
-            CineVerse<span className="text-yellow-500">.</span>
+          <Link to="/" className="block">
+            <img src="/ticket-total-logo.png" alt="Ticket Total" className="h-9 w-auto object-contain drop-shadow-md" />
           </Link>
-          <div className="flex items-center gap-1.5 mt-1 text-xs text-yellow-500 uppercase tracking-widest font-semibold">
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-yellow-500 uppercase tracking-widest font-semibold">
             <ShieldCheck size={13} />
             <span>Admin Console</span>
           </div>

@@ -109,7 +109,7 @@ export const CustomerSignup = () => {
                 <Sparkles size={14} className="text-yellow-400" />
               </h3>
               <p className="text-xs text-neutral-300 mt-0.5 leading-relaxed">
-                List your cinema venue, manage auditoriums, and schedule showtimes on CineVerse.
+                List your cinema venue, manage auditoriums, and schedule showtimes on Ticket Total.
               </p>
               <Link
                 to="/theatre/signup"
@@ -124,9 +124,9 @@ export const CustomerSignup = () => {
 
         {/* Customer Signup Card */}
         <div className="bg-neutral-900/70 border border-white/10 rounded-3xl p-7 sm:p-9 backdrop-blur-xl shadow-2xl">
-          <div className="text-center mb-6">
-            <Link to="/" className="text-3xl font-black text-white tracking-tight">
-              CineVerse<span className="text-yellow-500">.</span>
+          <div className="text-center mb-6 flex flex-col items-center">
+            <Link to="/" className="inline-block">
+              <img src="/ticket-total-logo.png" alt="Ticket Total" className="h-11 w-auto object-contain drop-shadow-md" />
             </Link>
             <h1 className="text-xl font-bold text-white mt-3">Create Customer Account</h1>
             <p className="text-neutral-400 text-xs mt-1">

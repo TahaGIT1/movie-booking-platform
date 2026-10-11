@@ -43,8 +43,8 @@ export const AuthModal = () => {
           <X size={24} />
         </button>
         
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-black text-white tracking-tight">CineVerse<span className="text-yellow-500">.</span></h2>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <img src="/ticket-total-logo.png" alt="Ticket Total" className="h-11 w-auto object-contain mb-2 drop-shadow-md" />
           <p className="text-neutral-400 mt-2">
             {authModalMode === 'login' ? 'Welcome back! Please login to continue.' : 'Create an account to book tickets.'}
           </p>

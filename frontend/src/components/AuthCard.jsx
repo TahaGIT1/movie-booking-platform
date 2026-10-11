@@ -126,9 +126,10 @@ export const AuthCard = () => {
             </div>
 
             {/* Card Header */}
-            <div className="text-center mb-5">
+            <div className="text-center mb-5 flex flex-col items-center">
+                <img src="/ticket-total-logo.png" alt="Ticket Total" className="h-11 w-auto object-contain mb-2 drop-shadow-md" />
                 <h2 className="text-2xl sm:text-3xl font-heading font-bold text-white tracking-tight">
-                    {mode === 'signin' ? 'Welcome to CineVerse' : 'Join CineVerse'}
+                    {mode === 'signin' ? 'Welcome to Ticket Total' : 'Join Ticket Total'}
                 </h2>
                 <p className="text-xs sm:text-sm text-neutral-400 mt-1">
                     {mode === 'signin'
@@ -238,7 +239,7 @@ export const AuthCard = () => {
                     {isLoading ? (
                         <span>Processing...</span>
                     ) : (
-                        <span>{mode === 'signin' ? 'Sign In to CineVerse' : 'Create Customer Account'}</span>
+                        <span>{mode === 'signin' ? 'Sign In to Ticket Total' : 'Create Customer Account'}</span>
                     )}
                 </button>
             </form>

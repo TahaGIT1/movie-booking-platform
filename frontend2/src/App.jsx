@@ -49,9 +49,9 @@ const MainLayout = ({ children }) => {
       {!isAdminRoute && !isManagerRoute && (
         <footer className="border-t border-white/10 bg-[#07080c] py-10 px-6 sm:px-12 text-xs text-neutral-500 mt-16">
           <div className="max-w-[1720px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-white font-black tracking-tight font-heading text-base">CineVerse</span>
-              <span>© {new Date().getFullYear()} CineVerse Platform Ltd. All rights reserved.</span>
+            <div className="flex items-center gap-3">
+              <img src="/ticket-total-logo.png" alt="Ticket Total" className="h-6 w-auto object-contain" />
+              <span>© {new Date().getFullYear()} Ticket Total. All rights reserved.</span>
             </div>
             <div className="flex flex-wrap items-center gap-6 text-neutral-400">
               <a href="/cinemas" className="hover:text-white transition">Cinemas</a>

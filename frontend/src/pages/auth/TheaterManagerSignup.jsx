@@ -207,7 +207,7 @@ export const TheaterManagerSignup = () => {
             className="inline-flex items-center gap-2 text-sm text-neutral-400 hover:text-white transition group"
           >
             <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            Back to CineVerse
+            Back to Ticket Total
           </Link>
 
           <div className="flex items-center gap-2 text-xs">
@@ -230,7 +230,7 @@ export const TheaterManagerSignup = () => {
           <div className="relative z-10 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-xs font-bold tracking-wide uppercase mb-4">
               <Building2 size={14} />
-              CineVerse Partner Network
+              Ticket Total Partner Network
             </div>
             
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
@@ -238,7 +238,7 @@ export const TheaterManagerSignup = () => {
             </h1>
             
             <p className="text-neutral-300 text-sm sm:text-base mt-3 leading-relaxed">
-              Onboard your cinema to CineVerse. Configure screens, design seating layouts, schedule shows, and tap into millions of active moviegoers.
+              Onboard your cinema to Ticket Total. Configure screens, design seating layouts, schedule shows, and tap into millions of active moviegoers.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10 text-xs">

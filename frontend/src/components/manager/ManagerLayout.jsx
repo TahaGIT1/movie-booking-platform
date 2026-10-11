@@ -100,8 +100,8 @@ export const ManagerLayout = () => {
         {/* Brand & Cinema Header */}
         <div className="p-5 border-b border-white/5">
           <div className="flex items-center justify-between">
-            <Link to="/" className="text-xl font-black tracking-tight text-white flex items-center">
-              CineVerse<span className="text-yellow-500 text-2xl leading-none">.</span>
+            <Link to="/" className="flex items-center">
+              <img src="/ticket-total-logo.png" alt="Ticket Total" className="h-8 w-auto object-contain drop-shadow-md" />
             </Link>
             <span className="text-[10px] font-bold tracking-widest uppercase bg-yellow-500/10 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/20">
               Manager

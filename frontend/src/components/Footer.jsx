@@ -49,10 +49,11 @@ export const Footer = () => {
           {/* Brand Info & App */}
           <div className="lg:col-span-2 space-y-4">
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-2xl font-heading font-black tracking-tight text-white">
-                Logo
-              </span>
-              <span className="w-2 h-2 rounded-full bg-[#f5a623] inline-block shadow-[0_0_8px_#f5a623]"/>
+              <img 
+                src="/ticket-total-logo.png" 
+                alt="Ticket Total" 
+                className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,255,255,0.15)]" 
+              />
             </Link>
             <p className="text-neutral-400 leading-relaxed max-w-sm text-xs sm:text-sm">
               Malaysia & Southeast Asia's premier destination for cinema showtimes, blockbuster pre-booking, live music festivals, broadway stage plays, and 4K digital streams.
@@ -214,7 +215,7 @@ export const Footer = () => {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
           <div className="flex flex-wrap items-center gap-4 text-neutral-500">
-            <span>© 2024–2026 CinePass Technologies Sdn. Bhd. All rights reserved.</span>
+            <span>© 2024–2026 Ticket Total. All rights reserved.</span>
             <span>•</span>
             <Link to="/login" className="hover:text-neutral-300">Staff Portal</Link>
             <span>•</span>

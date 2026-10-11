@@ -53,11 +53,12 @@ export const Navbar = () => {
       <div className="max-w-[1720px] mx-auto flex justify-between items-center gap-4 sm:gap-6">
         {/* Left Side: Logo & Primary Tab */}
         <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-          <Link to="/" className="text-2xl font-heading font-black text-white tracking-tight flex items-center group">
-            <span className="bg-gradient-to-r from-white via-white to-neutral-400 bg-clip-text text-transparent">
-              CineVerse
-            </span>
-            <span className="text-[#f5a623] text-3xl leading-none group-hover:scale-125 transition-transform">.</span>
+          <Link to="/" className="flex items-center group">
+            <img 
+              src="/ticket-total-logo.png" 
+              alt="Ticket Total" 
+              className="h-9 sm:h-11 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,255,255,0.18)] hover:scale-105 transition-transform duration-200" 
+            />
           </Link>
 
           <div className="hidden lg:flex items-center gap-2 text-sm font-semibold">
