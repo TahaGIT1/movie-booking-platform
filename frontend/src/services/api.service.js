@@ -1,5 +1,30 @@
 import { API_BASE_URL } from '../config/constants';
 
+/**
+ * Reads a response body as JSON without throwing.
+ *
+ * When the backend is unreachable the Vite proxy answers 502 with an empty
+ * non-JSON body, so a bare `await res.json()` threw
+ * "Unexpected end of JSON input" straight into the UI.
+ */
+async function safeJson(res, fallback = null) {
+  try {
+    return await res.json();
+  } catch {
+    return fallback;
+  }
+}
+
+/** Turns an unreachable/error response into a message a user can act on. */
+function requestError(res, body, fallbackMessage) {
+  const serverMessage = body?.error?.message || body?.message;
+  if (serverMessage) return serverMessage;
+  if (res.status === 502 || res.status === 504) {
+    return 'Cannot reach the server. Is the backend running on port 5000?';
+  }
+  return `${fallbackMessage} (HTTP ${res.status}).`;
+}
+
 const getHeaders = (hasBody = false) => {
   const token = localStorage.getItem('token');
   const headers = {};
@@ -16,11 +41,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
     });
+    const body = await safeJson(res, {});
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || 'Login failed');
+      throw new Error(requestError(res, body, 'Login failed'));
     }
-    return await res.json();
+    return body;
   },
 
   register: async (userData) => {
@@ -29,9 +54,9 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok || !data.success) {
-      throw new Error(data.error?.message || data.message || 'Registration failed');
+      throw new Error(requestError(res, data, 'Registration failed'));
     }
     return data;
   },
@@ -42,9 +67,9 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...managerData, role: 'THEATRE_MANAGER' }),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok || !data.success) {
-      throw new Error(data.error?.message || data.message || 'Theatre Manager registration failed');
+      throw new Error(requestError(res, data, 'Theatre Manager registration failed'));
     }
     return data;
   },
@@ -66,20 +91,20 @@ export const api = {
   getMovies: async () => {
     const res = await fetch(API_BASE_URL + '/movies');
     if (!res.ok) return [];
-    const data = await res.json();
+    const data = await safeJson(res, {});
     return data.data || data;
   },
 
   searchMovies: async (q) => {
     const res = await fetch(`${API_BASE_URL}/movies/search?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) return [];
     return data.data || [];
   },
 
   getAdminMovies: async () => {
     const res = await fetch(`${API_BASE_URL}/admin/movies`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch movies');
     return data.data || [];
   },
@@ -90,7 +115,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(movieData),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) {
       const errMsg = data.error?.message || data.message || 'Failed to create movie';
       throw new Error(errMsg);
@@ -104,7 +129,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(movieData),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) {
       const errMsg = data.error?.message || data.message || 'Failed to update movie';
       throw new Error(errMsg);
@@ -117,7 +142,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to delete movie');
     return data;
   },
@@ -187,7 +212,7 @@ export const api = {
   // Theatre Manager: Profile & Analytics
   getMyTheatre: async () => {
     const res = await fetch(`${API_BASE_URL}/theatres/my`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch your cinema profile');
     return data.data;
   },
@@ -198,14 +223,14 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(updateData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to update theatre profile');
     return data.data;
   },
 
   getManagerAnalytics: async () => {
     const res = await fetch(`${API_BASE_URL}/theatres/my/analytics`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch analytics');
     return data.data;
   },
@@ -213,14 +238,14 @@ export const api = {
   // Screens
   getScreens: async () => {
     const res = await fetch(`${API_BASE_URL}/manager/screens`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch screens');
     return data.data || [];
   },
 
   getScreen: async (screenId) => {
     const res = await fetch(`${API_BASE_URL}/manager/screens/${screenId}`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch screen details');
     return data.data;
   },
@@ -231,7 +256,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(screenData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to create screen');
     return data.data;
   },
@@ -242,7 +267,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(updateData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to update screen');
     return data.data;
   },
@@ -252,7 +277,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to delete screen');
     return data;
   },
@@ -263,7 +288,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(seatConfig)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to configure seat layout');
     return data;
   },
@@ -274,7 +299,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(bulkData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to update seats');
     return data;
   },
@@ -288,7 +313,7 @@ export const api = {
     
     const url = `${API_BASE_URL}/manager/shows?${query.toString()}`;
     const res = await fetch(url, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch shows');
     return data.data || [];
   },
@@ -299,7 +324,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(showData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) {
       const errMessage = data.error?.message || data.message || 'Failed to schedule show';
       throw new Error(errMessage);
@@ -313,7 +338,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(updateData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to update show');
     return data.data;
   },
@@ -324,7 +349,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ baseTierPricing })
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to update movie pricing');
     return data;
   },
@@ -334,7 +359,7 @@ export const api = {
       method: 'PATCH',
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to cancel show');
     return data;
   },
@@ -344,7 +369,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to delete show');
     return data;
   },
@@ -358,7 +383,7 @@ export const api = {
 
     const url = `${API_BASE_URL}/bookings/theatre?${query.toString()}`;
     const res = await fetch(url, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch theatre bookings');
     return data.data || [];
   },
@@ -366,7 +391,7 @@ export const api = {
   // Staff Management
   getStaff: async () => {
     const res = await fetch(`${API_BASE_URL}/manager/staff`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch staff');
     return data.data || [];
   },
@@ -377,7 +402,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(staffData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to create staff member');
     return data.data;
   },
@@ -387,7 +412,7 @@ export const api = {
       method: 'PATCH',
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to toggle staff status');
     return data;
   },
@@ -397,7 +422,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to remove staff');
     return data;
   },
@@ -408,7 +433,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ bookingId })
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Ticket validation failed');
     return data;
   },
@@ -416,7 +441,7 @@ export const api = {
   // Customer Facing Services
   getMovieById: async (movieId) => {
     const res = await fetch(`${API_BASE_URL}/movies/${movieId}`);
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch movie');
     return data.data || data;
   },
@@ -428,21 +453,21 @@ export const api = {
     if (date) query.append('date', date);
 
     const res = await fetch(`${API_BASE_URL}/shows/public?${query.toString()}`);
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch shows');
     return data.data || [];
   },
 
   getShowById: async (showId) => {
     const res = await fetch(`${API_BASE_URL}/shows/${showId}`);
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch show details');
     return data.data;
   },
 
   getShowSeats: async (showId) => {
     const res = await fetch(`${API_BASE_URL}/shows/${showId}/seats`);
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to load seats');
     return data.data || [];
   },
@@ -453,7 +478,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ seatIds })
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) {
       const err = new Error(data.error?.message || data.message || 'Failed to lock seats');
       err.code = data.error?.code;
@@ -469,7 +494,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ seatIds })
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to release seats');
     return data;
   },
@@ -479,7 +504,7 @@ export const api = {
       method: 'POST',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to release all holds');
     return data;
   },
@@ -488,7 +513,7 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}/shows/my-active-hold`, {
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to check active hold');
     return data.data;
   },
@@ -499,7 +524,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ showId, seatIds })
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to initiate booking');
     return data.data;
   },
@@ -510,21 +535,21 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ status })
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Payment simulation failed');
     return data;
   },
 
   getBookingById: async (bookingId) => {
     const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch booking');
     return data.data;
   },
 
   getMyBookings: async () => {
     const res = await fetch(`${API_BASE_URL}/bookings/my`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch your bookings');
     return data.data || [];
   },
@@ -534,14 +559,14 @@ export const api = {
       method: 'POST',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to cancel booking');
     return data;
   },
 
   getUserProfile: async () => {
     const res = await fetch(`${API_BASE_URL}/auth/me`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch user profile');
     return data.data;
   },
@@ -552,7 +577,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(profileData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to update user profile');
     return data.data;
   },
@@ -562,14 +587,14 @@ export const api = {
       ? `${API_BASE_URL}/theatres?city=${encodeURIComponent(city)}`
       : `${API_BASE_URL}/theatres`;
     const res = await fetch(url);
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to fetch theatres');
     return data.data || [];
   },
 
   getNotifications: async () => {
     const res = await fetch(`${API_BASE_URL}/notifications`, { headers: getHeaders() });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) return { data: [], unreadCount: 0 };
     return data;
   },
@@ -579,7 +604,7 @@ export const api = {
       method: 'PATCH',
       headers: getHeaders()
     });
-    return await res.json();
+    return await safeJson(res, {});
   },
 
   markAllNotificationsRead: async () => {
@@ -587,13 +612,13 @@ export const api = {
       method: 'POST',
       headers: getHeaders()
     });
-    return await res.json();
+    return await safeJson(res, {});
   },
 
   // Movie Reviews (Feature 12)
   getMovieReviews: async (movieId) => {
     const res = await fetch(`${API_BASE_URL}/movies/${movieId}/reviews`);
-    const data = await res.json();
+    const data = await safeJson(res, {});
     return data;
   },
 
@@ -603,7 +628,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(reviewData)
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to submit review');
     return data;
   },
@@ -613,7 +638,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders()
     });
-    return await res.json();
+    return await safeJson(res, {});
   },
 
   // Watchlist (Feature 13)
@@ -621,7 +646,7 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}/movies/${movieId}/watchlist`, {
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     return data;
   },
 
@@ -630,7 +655,7 @@ export const api = {
       method: 'POST',
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.message || 'Failed to update watchlist');
     return data;
   },
@@ -639,7 +664,7 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}/movies/watchlist/my`, {
       headers: getHeaders()
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     return data;
   }
 };

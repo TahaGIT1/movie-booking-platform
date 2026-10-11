@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, AlertCircle, Sparkles, User, Phone, Mail, Lock, Building2, ArrowRight } from 'lucide-react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Eye, EyeOff, AlertCircle, User, Phone, Mail, Lock, Building2, ArrowRight } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export const AuthCard = () => {
     const [searchParams] = useSearchParams();
-    const navigate = useNavigate();
     const { login } = useAuth();
     const redirectTo = searchParams.get('redirect') || '/';
     const [mode, setMode] = useState('signin');
@@ -19,19 +18,29 @@ export const AuthCard = () => {
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
+    /**
+     * Fills the form with one of the accounts created by
+     * `backend/prisma/seed.js`.
+     *
+     * These previously pointed at `inox@cinepolis.com` and
+     * `prateekrnerli@gmail.com`, neither of which the seed creates, and used
+     * `Pass@123` for an admin account seeded as `Admin@123`. Every button
+     * therefore failed authentication. The credentials below match what the
+     * seed actually provisions.
+     */
     const fillQuickDemo = (role) => {
         setMode('signin');
         setErrorMessage('');
         setSuccessMessage('');
         if (role === 'admin') {
             setEmail('admin@cineverse.com');
-            setPassword('Pass@123');
+            setPassword('Admin@123');
         } else if (role === 'manager') {
-            setEmail('inox@cinepolis.com');
-            setPassword('Pass@123');
+            setEmail('manager@cinepass.com');
+            setPassword('Password123!');
         } else {
-            setEmail('prateekrnerli@gmail.com');
-            setPassword('Pass@123');
+            setEmail('customer@cinepass.com');
+            setPassword('Password123!');
         }
     };
 
@@ -61,7 +70,7 @@ export const AuthCard = () => {
                 if (res.success && res.data) {
                     setSuccessMessage(`Welcome back, ${res.data.user.fullName}! Redirecting...`);
                     setTimeout(() => {
-                        login(res.data.accessToken, res.data.user);
+                        login(res.data.accessToken, res.data.user, redirectTo);
                     }, 600);
                 } else {
                     setErrorMessage(res.error || 'Invalid email or password.');
@@ -77,14 +86,21 @@ export const AuthCard = () => {
                 if (res.success && res.data) {
                     setSuccessMessage(`Account created! Welcome, ${res.data.user.fullName}!`);
                     setTimeout(() => {
-                        login(res.data.accessToken, res.data.user);
+                        login(res.data.accessToken, res.data.user, redirectTo);
                     }, 600);
                 } else {
                     setErrorMessage(res.error || 'Failed to create account.');
                 }
             }
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Authentication failed';
+            // A dead backend used to surface here as a raw
+            // "Unexpected end of JSON input" SyntaxError, which read like a
+            // broken page rather than an unreachable server.
+            const msg = err instanceof SyntaxError
+                ? 'Cannot reach the server. Make sure the backend is running on port 5000.'
+                : err instanceof Error
+                    ? err.message
+                    : 'Authentication failed. Please try again.';
             setErrorMessage(msg);
         } finally {
             setIsLoading(false);
@@ -224,7 +240,8 @@ export const AuthCard = () => {
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white cursor-pointer"
                         >
                             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>

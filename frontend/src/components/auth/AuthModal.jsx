@@ -30,7 +30,15 @@ export const AuthModal = () => {
         login(result.data.accessToken, result.data.user);
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed');
+      // The raw message here used to be a bare
+      // "Failed to execute 'json' on 'Response'" parse error, which gave the
+      // user no idea that the real problem was an unreachable backend.
+      const msg = err instanceof SyntaxError
+        ? 'Cannot reach the server. Make sure the backend is running on port 5000.'
+        : err instanceof Error
+          ? err.message
+          : 'Authentication failed. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -39,7 +47,7 @@ export const AuthModal = () => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
       <div className="bg-[#0a0b0e]/90 border border-white/10 p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-300">
-        <button onClick={closeAuthModal} className="absolute top-4 right-4 text-neutral-400 hover:text-white transition">
+        <button onClick={closeAuthModal} aria-label="Close sign in dialog" className="absolute top-4 right-4 text-neutral-400 hover:text-white transition">
           <X size={24} />
         </button>
         
