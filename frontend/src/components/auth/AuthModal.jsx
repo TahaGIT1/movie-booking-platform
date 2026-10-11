@@ -105,6 +105,36 @@ export const AuthModal = () => {
           )}
         </div>
 
+        {/* Quick Demo Credentials */}
+        {authModalMode === 'login' && (
+          <div className="mt-4 pt-4 border-t border-white/5 text-center">
+            <p className="text-[11px] text-neutral-400 mb-2 font-medium">Quick Demo Accounts:</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setEmail('andrew@gmail.com'); setPassword('password'); }}
+                className="px-2.5 py-1 rounded-lg text-[11px] bg-white/5 hover:bg-yellow-500/20 hover:text-yellow-400 border border-white/10 text-neutral-300 transition cursor-pointer"
+              >
+                Andrew (andrew@gmail.com)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail('customer@tickettotal.com'); setPassword('Customer@123'); }}
+                className="px-2.5 py-1 rounded-lg text-[11px] bg-white/5 hover:bg-yellow-500/20 hover:text-yellow-400 border border-white/10 text-neutral-300 transition cursor-pointer"
+              >
+                Customer
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail('admin@gmail.com'); setPassword('admin'); }}
+                className="px-2.5 py-1 rounded-lg text-[11px] bg-white/5 hover:bg-yellow-500/20 hover:text-yellow-400 border border-white/10 text-neutral-300 transition cursor-pointer"
+              >
+                Admin
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* PROMINENT THEATER MANAGER SIGNUP LINK */}
         {authModalMode === 'signup' && (
           <div className="mt-5 pt-5 border-t border-white/10 text-center">
