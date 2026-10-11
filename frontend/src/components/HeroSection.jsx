@@ -108,7 +108,10 @@ export const HeroSection = ({ config, onOpenBooking, onPlayTrailer, onStatusCate
               )}
               
               <span className="text-xs sm:text-sm text-neutral-300 font-medium">
-                Genre: <span className="text-neutral-400">{currentItem.genre || 'Action'}</span>
+                {config.pageType === 'events' ? 'Category: ' : 'Genre: '}
+                <span className="text-neutral-400">
+                  {currentItem.genre || currentItem.categoryLabel || currentItem.category || (config.pageType === 'events' ? 'Live Experience' : 'Action')}
+                </span>
               </span>
 
               <div className="flex items-center gap-1.5">
@@ -128,7 +131,9 @@ export const HeroSection = ({ config, onOpenBooking, onPlayTrailer, onStatusCate
               <PrimaryButton 
                 icon={primaryAction.icon || (config.pageType === 'streams' ? 'play' : 'ticket')} 
                 onClick={() => {
-                  if (config.pageType === 'streams') {
+                  if (primaryAction.external && primaryAction.link) {
+                    window.open(primaryAction.link, '_blank');
+                  } else if (config.pageType === 'streams') {
                     if (onPlayTrailer) {
                       onPlayTrailer(currentItem);
                     }

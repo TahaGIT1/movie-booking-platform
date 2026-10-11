@@ -5,6 +5,7 @@ import { Footer } from './components/Footer';
 import { SearchModal } from './components/SearchModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { CitySelectionModal } from './components/CitySelectionModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
 import { LocationProvider } from './contexts/LocationContext';
 // Customer Discovery & Booking Pages
@@ -58,7 +59,8 @@ function AppLayout() {
 
       {/* Routes Content */}
       <div className="flex-1 flex flex-col">
-        <Routes>
+        <ErrorBoundary>
+          <Routes>
           {/* Customer Discovery Routes */}
           <Route path="/" element={<HomePage />}/>
           <Route path="/events" element={<EventsPage />}/>
@@ -110,6 +112,7 @@ function AppLayout() {
           {/* Fallback to Home */}
           <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes>
+        </ErrorBoundary>
       </div>
 
       {/* Global Footer for discovery routes */}
