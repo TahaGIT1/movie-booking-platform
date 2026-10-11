@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HeroSection } from '../components/HeroSection';
-import { api } from '../services/api';
+import { api, DEFAULT_FALLBACK_MOVIES } from '../services/api';
 import { BookingModal } from '../components/BookingModal';
 import { TrailerModal } from '../components/TrailerModal';
 import { NowShowingGrid } from '../components/NowShowingGrid';
@@ -8,12 +8,51 @@ import { ExperienceBanners } from '../components/ExperienceBanners';
 import { TheatresSection } from '../components/TheatresSection';
 import { OffersSection } from '../components/OffersSection';
 
+// High-fidelity Hero Skeleton to eliminate Layout Shift (CLS) on initial mount
+const HeroSkeleton = () => (
+  <div className="relative w-full min-h-[calc(100vh-5rem)] flex flex-col justify-between overflow-hidden bg-[#0a0b0e] animate-pulse">
+    <div className="relative z-10 w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-10 pt-4 sm:pt-8 pb-4 flex-1 flex flex-col justify-between">
+      <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center flex-1 my-auto">
+        <div className="lg:col-span-6 flex flex-col justify-center max-w-2xl">
+          <div className="h-4 w-32 bg-white/10 rounded-full mb-4"></div>
+          <div className="h-14 sm:h-20 w-3/4 bg-white/10 rounded-2xl mb-4"></div>
+          <div className="flex gap-3 mb-6">
+            <div className="h-5 w-24 bg-white/10 rounded-full"></div>
+            <div className="h-5 w-20 bg-white/10 rounded-full"></div>
+          </div>
+          <div className="h-20 w-full bg-white/5 rounded-xl mb-8"></div>
+          <div className="flex gap-4">
+            <div className="h-12 w-36 bg-[#f5a623]/20 rounded-xl"></div>
+            <div className="h-12 w-32 bg-white/10 rounded-xl"></div>
+          </div>
+        </div>
+        <div className="lg:col-span-6 flex items-center justify-end gap-4 overflow-hidden">
+          <div className="w-48 aspect-[2/3] bg-white/5 rounded-2xl border border-white/10"></div>
+          <div className="w-52 aspect-[2/3] bg-white/10 rounded-2xl border border-white/15"></div>
+          <div className="w-48 aspect-[2/3] bg-white/5 rounded-2xl border border-white/10"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const getInitialState = (key) => {
+  try {
+    const cached = localStorage.getItem(`tt_cached_${key}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return key === 'nowPlaying' && Array.isArray(DEFAULT_FALLBACK_MOVIES) ? DEFAULT_FALLBACK_MOVIES : [];
+};
+
 export const HomePage = () => {
   const [bookingItem, setBookingItem] = useState(null);
   const [trailerItem, setTrailerItem] = useState(null);
-  const [nowPlaying, setNowPlaying] = useState([]);
-  const [upcoming, setUpcoming] = useState([]);
-  const [trending, setTrending] = useState([]);
+  const [nowPlaying, setNowPlaying] = useState(() => getInitialState('nowPlaying'));
+  const [upcoming, setUpcoming] = useState(() => getInitialState('upcoming'));
+  const [trending, setTrending] = useState(() => getInitialState('trending'));
   const [activeTab, setActiveTab] = useState('now');
   const [loading, setLoading] = useState(true);
 
@@ -25,9 +64,18 @@ export const HomePage = () => {
       api.getTrending().catch(() => []),
     ]).then(([np, up, tr]) => {
       if (isMounted) {
-        setNowPlaying(Array.isArray(np) ? np : []);
-        setUpcoming(Array.isArray(up) ? up : []);
-        setTrending(Array.isArray(tr) ? tr : []);
+        if (Array.isArray(np) && np.length > 0) {
+          setNowPlaying(np);
+          try { localStorage.setItem('tt_cached_nowPlaying', JSON.stringify(np)); } catch {}
+        }
+        if (Array.isArray(up) && up.length > 0) {
+          setUpcoming(up);
+          try { localStorage.setItem('tt_cached_upcoming', JSON.stringify(up)); } catch {}
+        }
+        if (Array.isArray(tr) && tr.length > 0) {
+          setTrending(tr);
+          try { localStorage.setItem('tt_cached_trending', JSON.stringify(tr)); } catch {}
+        }
         setLoading(false);
       }
     }).catch(() => {
@@ -77,15 +125,17 @@ export const HomePage = () => {
 
   return (
     <main className="w-full">
-      {/* 1. PRIMARY FIGMA REFERENCE HERO SECTION (rendered only if movies exist in DB/TMDB) */}
-      {heroMovies.length > 0 && (
+      {/* 1. PRIMARY FIGMA REFERENCE HERO SECTION */}
+      {heroMovies.length > 0 ? (
         <HeroSection
           config={heroConfig}
           onOpenBooking={setBookingItem}
           currentStatusCategory={activeTab === 'upcoming' ? 'upcoming' : 'now'}
           onStatusCategoryChange={(status) => setActiveTab(status)}
         />
-      )}
+      ) : loading ? (
+        <HeroSkeleton />
+      ) : null}
 
       {/* 2. NOW SHOWING / COMING SOON / TRENDING CATALOG GRID */}
       {gridItems.length > 0 ? (
@@ -98,14 +148,23 @@ export const HomePage = () => {
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab)}
         />
-      ) : !loading ? (
-
+      ) : loading ? (
+        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-10 py-12">
+          <div className="h-8 w-64 bg-white/10 rounded-xl mb-4 animate-pulse" />
+          <div className="h-4 w-96 bg-white/5 rounded-lg mb-8 animate-pulse" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="aspect-[2/3] bg-white/5 rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ) : (
         <div className="w-full max-w-[1720px] mx-auto px-6 py-16 text-center">
           <div className="inline-flex p-4 rounded-full bg-white/5 border border-white/10 mb-4 text-3xl">🎬</div>
           <h2 className="text-xl font-bold text-white mb-2">No Movies Found in Database</h2>
           <p className="text-sm text-neutral-400">There are currently no movies scheduled in the database catalog.</p>
         </div>
-      ) : null}
+      )}
 
       {/* 3. PREMIUM AUDITORIUM FORMATS */}
       <ExperienceBanners />
@@ -113,8 +172,8 @@ export const HomePage = () => {
       {/* 4. THEATRES & SHOWTIMES NEAR YOU */}
       <TheatresSection
         onSelectTime={(_theatre, _time) => {
-          if (movies.length > 0) {
-            setBookingItem(movies[0]);
+          if (nowPlaying.length > 0) {
+            setBookingItem(nowPlaying[0]);
           }
         }}
       />

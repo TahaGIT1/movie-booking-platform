@@ -38,7 +38,7 @@ export const EventsPage = () => {
       activeOption: 'Live Now',
       secondaryOption: 'Upcoming',
     },
-    items: events.slice(0, 4),
+    items: events.slice(0, 8),
   };
 
   return (

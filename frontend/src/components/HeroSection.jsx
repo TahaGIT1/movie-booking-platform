@@ -5,10 +5,22 @@ import { PrimaryButton } from './PrimaryButton';
 import { SecondaryButton } from './SecondaryButton';
 import { CategoryFilter } from './CategoryFilter';
 import { Carousel } from './Carousel';
-export const HeroSection = ({ config, onOpenBooking, onStatusCategoryChange, currentStatusCategory = 'now' }) => {
+export const HeroSection = ({ config, onOpenBooking, onPlayTrailer, onStatusCategoryChange, currentStatusCategory = 'now' }) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [selectedGenre, setSelectedGenre] = useState(config.genres[0] || 'All');
     const [statusCategory, setStatusCategory] = useState(currentStatusCategory);
+    const [isPaused, setIsPaused] = useState(false);
+
+    // Automatic slideshow: smoothly auto-advance every 4.5 seconds
+    useEffect(() => {
+        if (isPaused || !config.items || config.items.length <= 1) return;
+
+        const timer = setInterval(() => {
+            setSelectedIndex((prev) => (prev + 1) % config.items.length);
+        }, 4500);
+
+        return () => clearInterval(timer);
+    }, [isPaused, config.items, selectedIndex]);
 
     // Keep internal status synchronized with external prop if provided
     useEffect(() => {
@@ -25,11 +37,15 @@ export const HeroSection = ({ config, onOpenBooking, onStatusCategoryChange, cur
         ? currentItem.formats
         : ['2D', 'IMAX'];
     const primaryAction = currentItem.primaryAction || {
-        label: 'Book Now',
-        icon: 'ticket',
+        label: config.pageType === 'streams' ? 'Watch Trailer' : 'Book Now',
+        icon: config.pageType === 'streams' ? 'play' : 'ticket',
         link: `/book/${currentItem.id}`,
     };
-    return (<div className="relative w-full min-h-[calc(100vh-5rem)] flex flex-col justify-between overflow-hidden">
+    return (<div 
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        className="relative w-full min-h-[calc(100vh-5rem)] flex flex-col justify-between overflow-hidden"
+    >
       {/* Background Image with Cinematic Gradient Overlays */}
       <div className="absolute inset-0 z-0">
         <img src={currentItem.backdropImage || currentItem.posterImage || '/images/backgrounds/batman_hero.jpg'} alt={currentItem.title || 'Movie'} key={currentItem.backdropImage || currentItem.id} className="w-full h-full object-cover object-center animate-in fade-in duration-700 transform scale-105" onError={(e) => {
@@ -82,7 +98,14 @@ export const HeroSection = ({ config, onOpenBooking, onStatusCategoryChange, cur
 
             {/* Rating Stars + Genre + Badges Row */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 mb-4">
-              <Rating score={typeof currentItem.rating === 'number' ? currentItem.rating : 4.5}/>
+              {currentItem.imdbRating ? (
+                <div className="inline-flex items-center gap-1.5 bg-[#f5c518] text-black px-2 py-0.5 rounded font-black text-xs shadow-sm">
+                  <span className="tracking-tight font-extrabold text-[11px] leading-none">IMDb</span>
+                  <span className="font-extrabold text-[11px] leading-none">{currentItem.imdbRating}</span>
+                </div>
+              ) : (
+                <Rating score={typeof currentItem.rating === 'number' ? currentItem.rating : 4.5}/>
+              )}
               
               <span className="text-xs sm:text-sm text-neutral-300 font-medium">
                 Genre: <span className="text-neutral-400">{currentItem.genre || 'Action'}</span>
@@ -102,12 +125,19 @@ export const HeroSection = ({ config, onOpenBooking, onStatusCategoryChange, cur
 
             {/* Action Buttons: Book Now (Gold) + More Info (Dark) */}
             <div className="flex items-center gap-3 sm:gap-4">
-              <PrimaryButton icon={primaryAction.icon || (config.pageType === 'streams' ? 'play' : 'ticket')} onClick={() => {
-            if (onOpenBooking && config.pageType !== 'streams') {
-                onOpenBooking(currentItem);
-            }
-        }} to={config.pageType === 'streams' ? primaryAction.link : undefined}>
-                {primaryAction.label || 'Book Now'}
+              <PrimaryButton 
+                icon={primaryAction.icon || (config.pageType === 'streams' ? 'play' : 'ticket')} 
+                onClick={() => {
+                  if (config.pageType === 'streams') {
+                    if (onPlayTrailer) {
+                      onPlayTrailer(currentItem);
+                    }
+                  } else if (onOpenBooking) {
+                    onOpenBooking(currentItem);
+                  }
+                }}
+              >
+                {config.pageType === 'streams' ? 'Watch Trailer' : (primaryAction.label || 'Book Now')}
               </PrimaryButton>
 
               <SecondaryButton to={currentItem.secondaryAction?.link || `/movie/${currentItem.id}`}>

@@ -38,7 +38,7 @@ export const PlaysPage = () => {
       activeOption: 'In Repertoire',
       secondaryOption: 'Upcoming Season',
     },
-    items: plays.slice(0, 4),
+    items: plays.slice(0, 8),
   };
 
   return (

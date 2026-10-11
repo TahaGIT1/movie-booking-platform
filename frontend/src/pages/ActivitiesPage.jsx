@@ -38,7 +38,7 @@ export const ActivitiesPage = () => {
       activeOption: 'Open Today',
       secondaryOption: 'Weekend Passes',
     },
-    items: activities.slice(0, 4),
+    items: activities.slice(0, 8),
   };
 
   return (

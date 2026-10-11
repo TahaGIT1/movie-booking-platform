@@ -38,7 +38,7 @@ export const SportsPage = () => {
       activeOption: 'Live Matches',
       secondaryOption: 'Tournament Fixtures',
     },
-    items: sports.slice(0, 4),
+    items: sports.slice(0, 8),
   };
 
   return (
