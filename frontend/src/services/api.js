@@ -5,7 +5,35 @@
  * Connects to VITE_API_BASE_URL (defaults to /api with Vite dev proxy).
  */
 
+import { filterByBelagavi } from '../constants/locations';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+/**
+ * Reads a response body as JSON without ever throwing.
+ *
+ * Every endpoint in this file is reached through the Vite dev proxy, so any
+ * failure to reach the backend (or any proxy/HTML error page) comes back as a
+ * non-JSON body. A bare `await res.json()` then throws a SyntaxError such as
+ * "Unexpected end of JSON input", which used to surface to users as an
+ * unrelated-looking parse error on the login and payment screens.
+ *
+ * Returns `fallback` when the body is not valid JSON.
+ */
+async function safeJson(res, fallback = null) {
+  try {
+    return await res.json();
+  } catch {
+    return fallback;
+  }
+}
+
+/** Pulls a list out of the several envelope shapes the API returns. */
+function toList(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
 
 export const DEFAULT_FALLBACK_MOVIES = [
   {
@@ -202,64 +230,69 @@ export const DEFAULT_FALLBACK_MOVIES = [
   },
 ];
 
+/**
+ * Demo catalogue used only when the backend is unreachable.
+ *
+ * Venues are Belagavi properties so the offline demo stays consistent with the
+ * city filter applied to live data.
+ */
 export const DEFAULT_FALLBACK_THEATRES = [
   {
-    id: 'pavilion-elite-imax',
-    name: 'Dadi Cinema & IMAX Pavilion Elite',
-    location: 'Level 7, Pavilion Kuala Lumpur, Bukit Bintang',
-    city: 'Kuala Lumpur',
+    id: 'belagavi-cineplex-imax',
+    name: 'Belagavi Cineplex IMAX',
+    location: '2nd Floor, Deccan Plaza, Station Road',
+    city: 'Belagavi',
     distance: '1.2 km away',
-    features: ['IMAX with Laser', 'Star-Max Bed Lounge', 'Dolby Atmos', 'Gourmet Bar'],
+    features: ['IMAX with Laser', 'Recliner Lounge', 'Dolby Atmos', 'Food Court'],
     showtimes: [
-      { format: 'IMAX Laser 2D', times: ['11:30 AM', '02:45 PM', '06:15 PM', '09:30 PM', '12:15 AM'], price: 38 },
-      { format: 'Dolby Atmos', times: ['12:30 PM', '03:45 PM', '07:00 PM', '10:15 PM'], price: 26 },
-      { format: 'Star-Max VIP Bed', times: ['04:00 PM', '08:00 PM', '11:00 PM'], price: 90 },
+      { format: 'IMAX Laser 2D', times: ['11:30 AM', '02:45 PM', '06:15 PM', '09:30 PM'], price: 220 },
+      { format: 'Dolby Atmos', times: ['12:30 PM', '03:45 PM', '07:00 PM', '10:15 PM'], price: 160 },
+      { format: 'Recliner VIP', times: ['04:00 PM', '08:00 PM'], price: 350 },
     ],
   },
   {
-    id: 'gsc-mid-valley',
-    name: 'GSC Mid Valley Megamall',
-    location: 'Level 3, Mid Valley Megamall, Lingkaran Syed Putra',
-    city: 'Kuala Lumpur',
-    distance: '4.8 km away',
-    features: ['ScreenX 270°', '4DX Motion', 'Dolby Atmos', 'Premiere Class'],
+    id: 'shastri-nagar-cinemas',
+    name: 'Shastri Nagar Multiplex',
+    location: 'Shastri Nagar Main Road, Belagavi',
+    city: 'Belagavi',
+    distance: '3.4 km away',
+    features: ['4DX Motion', 'Dolby Atmos', 'Premiere Class'],
     showtimes: [
-      { format: 'ScreenX 270°', times: ['01:15 PM', '04:30 PM', '07:45 PM', '10:45 PM'], price: 32 },
-      { format: '4DX Motion & Effects', times: ['12:00 PM', '03:15 PM', '06:30 PM', '09:45 PM'], price: 35 },
-      { format: 'Digital 2D', times: ['10:45 AM', '01:50 PM', '05:00 PM', '08:15 PM', '11:20 PM'], price: 22 },
+      { format: '4DX Motion & Effects', times: ['12:00 PM', '03:15 PM', '06:30 PM', '09:45 PM'], price: 190 },
+      { format: 'Digital 2D', times: ['10:45 AM', '01:50 PM', '05:00 PM', '08:15 PM'], price: 120 },
     ],
   },
   {
-    id: 'tgv-sunway-pyramid',
-    name: 'TGV Sunway Pyramid IMAX',
-    location: 'F1.M1, Sunway Pyramid Shopping Mall, Bandar Sunway',
-    city: 'Petaling Jaya',
-    distance: '14.2 km away',
-    features: ['IMAX 12-Track Sound', 'INDULGE Luxury Suites', 'Beanie Beanbag Hall'],
+    id: 'gandibedchinchod-screens',
+    name: 'Gandibedchinchod Screens',
+    location: 'Khanapur Road, Belagavi',
+    city: 'Belagavi',
+    distance: '6.1 km away',
+    features: ['ScreenX 270°', 'INDULGE Luxury Suites', 'Beanbag Hall'],
     showtimes: [
-      { format: 'IMAX 2D', times: ['11:00 AM', '02:15 PM', '05:30 PM', '08:45 PM'], price: 36 },
-      { format: 'INDULGE Luxury', times: ['01:00 PM', '04:30 PM', '07:30 PM', '10:30 PM'], price: 75 },
-      { format: 'Standard 2D', times: ['10:30 AM', '01:30 PM', '04:30 PM', '07:30 PM', '10:30 PM'], price: 20 },
+      { format: 'ScreenX 270°', times: ['01:15 PM', '04:30 PM', '07:45 PM'], price: 200 },
+      { format: 'Luxury Lounge', times: ['05:00 PM', '09:00 PM'], price: 320 },
+      { format: 'Standard 2D', times: ['10:30 AM', '01:30 PM', '04:30 PM', '07:30 PM'], price: 110 },
     ],
   },
 ];
 
 export const DEFAULT_FALLBACK_OFFERS = [
   {
-    id: 'maybank-1for1',
-    title: 'Maybank 1-for-1 IMAX Movie Tickets',
-    code: 'MBBIMAX',
-    discount: 'Buy 1 Free 1',
-    description: 'Get a complimentary IMAX ticket every Saturday & Sunday with Maybank Cards.',
-    validUntil: '31 Dec 2024',
+    id: 'hdfc-buy1get1',
+    title: 'HDFC Bank 1-for-1 IMAX Movie Tickets',
+    code: 'HDFCIMAX',
+    discount: 'Buy 1 Get 1',
+    description: 'Get a complimentary IMAX ticket every Saturday & Sunday with HDFC Credit Cards.',
+    validUntil: '31 Dec 2026',
     bannerImage: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=600&auto=format&fit=crop&q=80',
     category: 'Bank Promo',
   },
   {
     id: 'student-thursday',
-    title: 'Student Special: Flat RM14 Tickets',
-    code: 'STUDENT14',
-    discount: 'Flat RM14',
+    title: 'Student Special: Flat ₹120 Tickets',
+    code: 'STUDENT120',
+    discount: 'Flat ₹120',
     description: 'Valid for all standard 2D showtimes on Thursdays before 6:00 PM with valid student ID.',
     validUntil: 'Every Thursday',
     bannerImage: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80',
@@ -286,7 +319,7 @@ export const DEFAULT_FALLBACK_STREAMS = [
     posterImage: '/images/streams/house-of-the-dragon.jpg',
     backdropImage: '/images/backgrounds/dragon_hero.jpg',
     primaryAction: { label: 'Watch Now', icon: 'play', link: 'https://www.youtube.com/watch?v=DotnJ7tTA34' },
-    secondaryAction: { label: 'More Info', link: '/streams/house-of-the-dragon' },
+    secondaryAction: { label: 'More Info', link: '/streams' },
     statusCategory: 'now',
   },
   {
@@ -307,7 +340,7 @@ export const DEFAULT_FALLBACK_STREAMS = [
     posterImage: '/images/streams/the-last-of-us.jpg',
     backdropImage: '/images/backgrounds/tlou_hero.jpg',
     primaryAction: { label: 'Watch Now', icon: 'play', link: 'https://www.youtube.com/watch?v=uLtkt8BonwM' },
-    secondaryAction: { label: 'More Info', link: '/streams/the-last-of-us' },
+    secondaryAction: { label: 'More Info', link: '/streams' },
     statusCategory: 'now',
   },
   {
@@ -328,7 +361,7 @@ export const DEFAULT_FALLBACK_STREAMS = [
     posterImage: '/images/streams/the-mandalorian.jpg',
     backdropImage: '/images/backgrounds/mando_hero.jpg',
     primaryAction: { label: 'Watch Now', icon: 'play', link: 'https://www.youtube.com/watch?v=aOC8E8R_N3Y' },
-    secondaryAction: { label: 'More Info', link: '/streams/the-mandalorian' },
+    secondaryAction: { label: 'More Info', link: '/streams' },
     statusCategory: 'now',
   },
   {
@@ -349,7 +382,7 @@ export const DEFAULT_FALLBACK_STREAMS = [
     posterImage: '/images/streams/stranger-things.jpg',
     backdropImage: '/images/backgrounds/stranger_hero.jpg',
     primaryAction: { label: 'Watch Now', icon: 'play', link: 'https://www.youtube.com/watch?v=b9EkMc79ZSU' },
-    secondaryAction: { label: 'More Info', link: '/streams/stranger-things' },
+    secondaryAction: { label: 'More Info', link: '/streams' },
     statusCategory: 'now',
   },
 ];
@@ -420,7 +453,7 @@ export const DEFAULT_FALLBACK_SPORTS = [
     genre: 'motorsport, f1, racing',
     genreTags: ['Racing', 'Live Screening'],
     formats: ['IMAX LASER', 'DOLBY ATMOS'],
-    description: 'Experience every roaring engine, hairpin turn, and pitstop drama of the Marina Bay Street Circuit on Malaysia\'s biggest IMAX screen.',
+    description: 'Experience every roaring engine, hairpin turn, and pitstop drama of the Belagavi Street Circuit on India\'s biggest IMAX screen.',
     posterImage: '/images/sports/f1-night-race.jpg',
     backdropImage: '/images/sports/sports_hero.jpg',
     primaryAction: { label: 'Book Pass', icon: 'ticket', link: '/book/f1-singapore-screening' },
@@ -469,14 +502,14 @@ export const DEFAULT_FALLBACK_PLAYS = [
     genre: 'musical, drama, romance',
     genreTags: ['Musical', 'Drama'],
     formats: ['LIVE ORCHESTRA', 'ALL AGES'],
-    description: 'Andrew Lloyd Webber\'s timeless masterpiece returns to Kuala Lumpur with an international cast and a sweeping live 40-piece orchestra.',
+    description: 'Andrew Lloyd Webber\'s timeless masterpiece returns to Belagavi with an international cast and a sweeping live 40-piece orchestra.',
     posterImage: '/images/plays/phantom-opera.jpg',
     backdropImage: '/images/plays/plays_hero.jpg',
     primaryAction: { label: 'Book Seats', icon: 'ticket', link: '/book/phantom-of-the-opera' },
     secondaryAction: { label: 'More Info', link: '/plays/phantom-of-the-opera' },
     statusCategory: 'now',
     duration: '2h 30m',
-    venue: 'Istana Budaya, Kuala Lumpur',
+    venue: 'Kundapura Vedika, Belagavi',
     priceRM: 180,
     category: 'play',
   },
@@ -656,8 +689,15 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const body = await res.json();
+    const body = await safeJson(res, {});
     if (!res.ok || !body.success) {
+      if (!res.ok && !body.message && !body.error) {
+        throw new Error(
+          res.status === 502 || res.status === 504
+            ? 'Cannot reach the server. Is the backend running on port 5000?'
+            : `Login failed (HTTP ${res.status}).`
+        );
+      }
       throw new Error(body.error?.message || body.message || 'Login failed');
     }
     if (body.data?.accessToken) {
@@ -683,7 +723,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const body = await res.json();
+    const body = await safeJson(res, {});
     if (!res.ok || !body.success) {
       throw new Error(body.error?.message || body.message || 'Registration failed');
     }
@@ -839,40 +879,31 @@ export const api = {
     }
   },
 
-  async search(query) {
-    if (!query || !query.trim()) return { movies: [], theatres: [], events: [] };
-    try {
-      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`);
-      if (res.ok) {
-        const data = await res.json();
-        return {
-          movies: (data.movies || []).map((m, idx) => normalizeMediaItem(m, idx)),
-          theatres: data.theatres || [],
-          events: (data.events || []).map((e, idx) => normalizeMediaItem(e, idx)),
-        };
-      }
-      return { movies: [], theatres: [], events: [] };
-    } catch {
-      return { movies: [], theatres: [], events: [] };
-    }
-  },
-
 
 
 
   // Events, Streams, Plays, Sports, Activities
-  async getEvents() {
+  //
+  // These previously returned fallback data on an empty response, which made
+  // "nothing listed" indistinguishable from "backend unreachable" and left the
+  // pages' empty states unreachable. The distinction now matters: only a
+  // transport failure falls back to demo content, so a genuinely empty
+  // Belagavi catalogue renders the upcoming/coming-soon panel instead.
+  async fetchCategory(path, fallback) {
     try {
-      const res = await fetch(`${API_BASE_URL}/events`);
+      const res = await fetch(`${API_BASE_URL}${path}`);
       if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
+        const list = filterByBelagavi(toList(await safeJson(res, [])));
+        return list;
       }
-      return DEFAULT_FALLBACK_EVENTS;
     } catch {
-      return DEFAULT_FALLBACK_EVENTS;
+      // fall through to demo content
     }
+    return fallback;
+  },
+
+  async getEvents() {
+    return this.fetchCategory('/events', DEFAULT_FALLBACK_EVENTS);
   },
 
   async getEventById(id) {
@@ -889,17 +920,7 @@ export const api = {
   },
 
   async getStreams() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/streams`);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
-      }
-      return DEFAULT_FALLBACK_STREAMS;
-    } catch {
-      return DEFAULT_FALLBACK_STREAMS;
-    }
+    return this.fetchCategory('/streams', DEFAULT_FALLBACK_STREAMS);
   },
 
   async getStreamById(id) {
@@ -916,17 +937,7 @@ export const api = {
   },
 
   async getPlays() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/plays`);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
-      }
-      return DEFAULT_FALLBACK_PLAYS;
-    } catch {
-      return DEFAULT_FALLBACK_PLAYS;
-    }
+    return this.fetchCategory('/plays', DEFAULT_FALLBACK_PLAYS);
   },
 
   async getPlayById(id) {
@@ -943,17 +954,7 @@ export const api = {
   },
 
   async getSports() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/sports`);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
-      }
-      return DEFAULT_FALLBACK_SPORTS;
-    } catch {
-      return DEFAULT_FALLBACK_SPORTS;
-    }
+    return this.fetchCategory('/sports', DEFAULT_FALLBACK_SPORTS);
   },
 
   async getSportById(id) {
@@ -970,17 +971,7 @@ export const api = {
   },
 
   async getActivities() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/activities`);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
-      }
-      return DEFAULT_FALLBACK_ACTIVITIES;
-    } catch {
-      return DEFAULT_FALLBACK_ACTIVITIES;
-    }
+    return this.fetchCategory('/activities', DEFAULT_FALLBACK_ACTIVITIES);
   },
 
   async getActivityById(id) {
@@ -1003,9 +994,9 @@ export const api = {
         : `${API_BASE_URL}/theatres`;
       const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.data || []);
-        if (list.length > 0) return list;
+        // Theatres are the anchor for every listing, so the Belagavi filter is
+        // applied here as well as in the category getters.
+        return filterByBelagavi(toList(await safeJson(res, [])));
       }
       return DEFAULT_FALLBACK_THEATRES;
     } catch {
@@ -1034,9 +1025,15 @@ export const api = {
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ seatIds }),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok || !data.success) {
-      throw new Error(data.message || data.error?.message || 'Seats already locked or unavailable');
+      throw new Error(
+        data.message ||
+          data.error?.message ||
+          (res.status === 502 || res.status === 504
+            ? 'Cannot reach the server. Is the backend running on port 5000?'
+            : 'Seats already locked or unavailable')
+      );
     }
     return data;
   },
@@ -1085,22 +1082,41 @@ export const api = {
       headers: this.getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok || !data.success) {
-      throw new Error(data.error?.message || data.message || 'Booking creation failed');
+      throw new Error(
+        data.error?.message ||
+          data.message ||
+          (res.status === 502 || res.status === 504
+            ? 'Cannot reach the server. Is the backend running on port 5000?'
+            : 'Booking creation failed')
+      );
     }
     return data;
   },
 
-  // Unified Search with Category Context
+  // Unified Search with Category Context.
+  // This is the only `search` definition — an earlier duplicate shadowed this
+  // one, so the empty-query guard and result normalisation were dead code.
   async search(query, category = '') {
+    const EMPTY = { movies: [], theatres: [], events: [], sports: [], plays: [], activities: [] };
+    if (!query || !query.trim()) return EMPTY;
     try {
       const catParam = category ? `&category=${encodeURIComponent(category)}` : '';
       const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}${catParam}`);
-      if (!res.ok) return { movies: [], theatres: [], events: [], sports: [], plays: [], activities: [] };
-      return await res.json();
+      if (!res.ok) return EMPTY;
+      const data = await safeJson(res, {});
+      return {
+        ...EMPTY,
+        movies: toList(data.movies).map((m, idx) => normalizeMediaItem(m, idx)).filter(Boolean),
+        theatres: filterByBelagavi(Array.isArray(data.theatres) ? data.theatres : []),
+        events: toList(data.events).map((e, idx) => normalizeMediaItem(e, idx)).filter(Boolean),
+        sports: Array.isArray(data.sports) ? data.sports : [],
+        plays: Array.isArray(data.plays) ? data.plays : [],
+        activities: Array.isArray(data.activities) ? data.activities : [],
+      };
     } catch {
-      return { movies: [], theatres: [], events: [], sports: [], plays: [], activities: [] };
+      return EMPTY;
     }
   },
 
@@ -1111,7 +1127,7 @@ export const api = {
       headers: this.getAuthHeaders(),
       body: JSON.stringify(movieData),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to create movie');
     return data.data;
   },
@@ -1122,7 +1138,7 @@ export const api = {
       headers: this.getAuthHeaders(),
       body: JSON.stringify(movieData),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update movie');
     return data.data;
   },
@@ -1132,7 +1148,7 @@ export const api = {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await safeJson(res, {});
     if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to delete movie');
     return data;
   },
