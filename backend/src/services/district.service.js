@@ -1,5 +1,6 @@
 import https from 'https';
 import { INDIAN_LIVE_EVENTS } from '../data/indianEvents.data.js';
+import { resolveEventAssets } from './eventAssets.js';
 
 // Cache for real-time scraped events
 let cachedLiveEvents = null;
@@ -118,7 +119,7 @@ function parseDistrictEvents(html, defaultCategory = 'comedy') {
         // Price heuristic from title/category
         const price = category === 'comedy' ? '₹399 onwards' : '₹999 onwards';
 
-        events.push({
+        const rawEvent = {
           id: 'dt-' + href.split('/').pop().replace(/-buy-tickets$/, '').slice(0, 36),
           title,
           venue,
@@ -130,11 +131,15 @@ function parseDistrictEvents(html, defaultCategory = 'comedy') {
           price,
           priceVal: category === 'comedy' ? 399 : 999,
           videoUrl: video || 'https://b.zmtcdn.com/districts/events/files/690326e2be837b145ab66f65/cover_video_1772660168004.mp4',
-          posterImage: img || 'https://b.zmtcdn.com/data/edition_assets/17916102172293.png',
+          posterImage: img,
           ticketUrl: href,
           rating: 4.8,
           badge: 'DISTRICT LIVE',
-        });
+        };
+        const assets = resolveEventAssets(rawEvent);
+        rawEvent.posterImage = assets.posterImage;
+        rawEvent.backdropImage = assets.backdropImage;
+        events.push(rawEvent);
       }
     }
   }

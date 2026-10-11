@@ -3,6 +3,7 @@ import { prisma } from '../../config/prisma.js';
 import { ticketmasterService } from '../../services/ticketmaster.service.js';
 import { INDIAN_LIVE_EVENTS } from '../../data/indianEvents.data.js';
 import { getRealTimeIndianEvents } from '../../services/district.service.js';
+import { resolveEventAssets } from '../../services/eventAssets.js';
 
 const router = Router();
 
@@ -194,21 +195,26 @@ router.get('/events', async (req, res, next) => {
       );
     }
 
-    const mapped = filtered.map((e, idx) => ({
-      ...e,
-      indexNumber: String(idx + 1).padStart(2, '0'),
-      primaryAction: {
-        label: 'Get Tickets',
-        icon: 'ticket',
-        external: true,
-        link: e.ticketUrl,
-      },
-      secondaryAction: {
-        label: 'More Info',
-        link: e.ticketUrl,
-        external: true,
-      },
-    }));
+    const mapped = filtered.map((e, idx) => {
+      const assets = resolveEventAssets(e);
+      return {
+        ...e,
+        posterImage: assets.posterImage,
+        backdropImage: assets.backdropImage,
+        indexNumber: String(idx + 1).padStart(2, '0'),
+        primaryAction: {
+          label: 'Get Tickets',
+          icon: 'ticket',
+          external: true,
+          link: e.ticketUrl,
+        },
+        secondaryAction: {
+          label: 'More Info',
+          link: e.ticketUrl,
+          external: true,
+        },
+      };
+    });
 
     return res.json(mapped);
   } catch (err) {

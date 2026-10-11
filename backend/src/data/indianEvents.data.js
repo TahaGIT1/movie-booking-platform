@@ -582,3 +582,12 @@ export const INDIAN_LIVE_EVENTS = [
   },
 ];
 
+import { resolveEventAssets } from '../services/eventAssets.js';
+
+for (const event of INDIAN_LIVE_EVENTS) {
+  const assets = resolveEventAssets(event);
+  event.posterImage = assets.posterImage;
+  event.backdropImage = assets.backdropImage;
+}
+
+
