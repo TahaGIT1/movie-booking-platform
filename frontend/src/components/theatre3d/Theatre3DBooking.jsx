@@ -13,6 +13,7 @@ import { buildCheckoutSummary, formatINR } from './lib/pricing';
 import { PRESET_IDS, PRESET_LABELS, buildCameraPresets, buildTourKeyframes, seatViewPreset, extractYouTubeId } from './lib/scene';
 
 const PAYMENT_DELAY_MS = 900;
+const TAP_TOAST_MS = 1800;
 
 function useMediaQuery(query) {
     const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
@@ -36,7 +37,14 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
     const navigate = useNavigate();
     const { item, layout, seatClasses, seatById, occupiedSet, selectedSeats, toggleSeat, applySelection, setErrorMessage, reserveSeats, user, openAuthModal, isSubmitting } = flow;
 
-    const isWide = useMediaQuery('(min-width: 1024px)');
+    // Layout: full side panel on laptops / landscape tablets, a slim side panel on landscape
+    // phones (too short for a bottom sheet), and a bottom sheet on portrait phones and tablets.
+    const isWide = useMediaQuery('(min-width: 1024px) and (min-height: 600px)');
+    const isLandscapePhone = useMediaQuery('(orientation: landscape) and (max-height: 599px) and (min-width: 560px)');
+    const hasSidePanel = isWide || isLandscapePhone;
+    const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
+    const [sheetHeight, setSheetHeight] = useState(0);
+    const floatingBottom = hasSidePanel ? 16 : sheetHeight + 12;
 
     // The theatre is a full-screen layer: stop the page (navbar/footer) scrolling behind it.
     useEffect(() => {
@@ -80,6 +88,7 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
     const tooltipRef = useRef(null);
     const [hoverId, setHoverId] = useState(null);
     const handleHover = useCallback((id, nativeEvent) => {
+        if (nativeEvent && nativeEvent.pointerType && nativeEvent.pointerType !== 'mouse') return;
         setHoverId((prev) => (prev === id ? prev : id));
         const el = tooltipRef.current;
         const stage = stageRef.current;
@@ -93,11 +102,22 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
 
     /* ---------- selection ---------- */
     const [lastSeat, setLastSeat] = useState(null);
+    const [tapToast, setTapToast] = useState(null); // { id, added } — touch feedback
+    const toastTimer = useRef(null);
+    useEffect(() => () => clearTimeout(toastTimer.current), []);
     const handleSelect = useCallback((id) => {
         if (occupiedSet.has(id)) return;
+        const added = !selectedSeats.includes(id);
         toggleSeat(id);
         setLastSeat(id);
-    }, [occupiedSet, toggleSeat]);
+        if (!canHover) {
+            clearTimeout(toastTimer.current);
+            setTapToast({ id, added, at: Date.now() });
+            toastTimer.current = setTimeout(() => setTapToast(null), TAP_TOAST_MS);
+        }
+    }, [occupiedSet, toggleSeat, selectedSeats, canHover]);
+    const toastSeat = tapToast ? seatById.get(tapToast.id) : null;
+    const toastClass = toastSeat ? seatClasses.find((c) => c.id === toastSeat.classId) : null;
 
     const handleBestSeats = useCallback((count) => {
         const ids = pickBestSeats(layout.seats, occupiedSet, count);
@@ -210,7 +230,7 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
 
                     {/* Camera presets */}
                     {!dimmed && (
-                        <nav aria-label="Camera views" className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex gap-1 p-1 rounded-full bg-black/45 border border-white/10 backdrop-blur-md max-w-[calc(100%-24px)] overflow-x-auto no-scrollbar">
+                        <nav aria-label="Camera views" className="absolute top-2 sm:top-3 left-1/2 -translate-x-1/2 z-10 flex gap-1 p-1 rounded-full bg-black/45 border border-white/10 backdrop-blur-md max-w-[calc(100%-24px)] overflow-x-auto no-scrollbar">
                             {PRESET_IDS.map((id) => (
                                 <button
                                     key={id}
@@ -235,10 +255,11 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
                             onClick={() => setIsTrailerMuted((m) => !m)}
                             aria-pressed={!isTrailerMuted}
                             aria-label={isTrailerMuted ? 'Turn trailer sound on' : 'Mute trailer'}
-                            className={`absolute right-3 z-10 ${isWide ? 'bottom-4' : 'bottom-[150px]'} inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-black/55 border border-white/15 backdrop-blur-md text-white text-xs font-semibold hover:bg-black/75 transition cursor-pointer`}
+                            style={{ bottom: floatingBottom }}
+                            className={`absolute right-3 z-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-full bg-black/55 border border-white/15 backdrop-blur-md text-white text-xs font-semibold hover:bg-black/75 transition cursor-pointer`}
                         >
                             {isTrailerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                            {isTrailerMuted ? 'Trailer sound' : 'Mute'}
+                            <span className="hidden sm:inline">{isTrailerMuted ? 'Trailer sound' : 'Mute'}</span>
                         </button>
                     )}
 
@@ -247,10 +268,20 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
                         <button
                             type="button"
                             onClick={() => goTo('seat', lastSeat)}
-                            className={`absolute left-3 z-10 ${isWide ? 'bottom-4' : 'bottom-[150px]'} inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-teal-400 text-black text-xs font-bold shadow-[0_0_20px_rgba(45,212,191,0.5)] cursor-pointer`}
+                            style={{ bottom: floatingBottom }}
+                            className={`absolute left-3 z-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-full bg-teal-400 text-black text-xs font-bold shadow-[0_0_20px_rgba(45,212,191,0.5)] cursor-pointer`}
                         >
                             <Eye className="w-3.5 h-3.5" /> View from {lastSeat}
                         </button>
+                    )}
+
+                    {/* Tap feedback on touch screens */}
+                    {!dimmed && toastSeat && toastClass && (
+                        <div key={tapToast.at} role="status" className="absolute top-14 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                            <div className={`tt-pop px-3.5 py-2 rounded-full border shadow-xl whitespace-nowrap text-xs font-bold backdrop-blur-md ${tapToast.added ? 'bg-teal-400/90 border-teal-200 text-black' : 'bg-[#0b0d16]/90 border-white/15 text-white'}`}>
+                                {tapToast.added ? 'Added' : 'Removed'} {toastSeat.id} · {toastClass.name} · {formatINR(toastClass.price)}
+                            </div>
+                        </div>
                     )}
 
                     {/* Hover tooltip, positioned imperatively to avoid re-rendering on every pointer move */}
@@ -270,8 +301,8 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
                         )}
                     </div>
 
-                    {!isWide && !dimmed && (
-                        <SeatSidebar variant="sheet" flow={flow} leftByClass={leftByClass} onBestSeats={handleBestSeats} onContinue={openCheckout} onViewSeat={(id) => goTo('seat', id)} />
+                    {!hasSidePanel && !dimmed && (
+                        <SeatSidebar variant="sheet" flow={flow} leftByClass={leftByClass} onBestSeats={handleBestSeats} onContinue={openCheckout} onViewSeat={(id) => goTo('seat', id)} onHeightChange={setSheetHeight} />
                     )}
 
                     {step === 'checkout' && (
@@ -295,9 +326,9 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
                     {step === 'done' && confirmed && <TicketConfirmed booking={confirmed} subtitle={subtitle} />}
                 </div>
 
-                {isWide && (
+                {hasSidePanel && (
                     <div className={`flex transition-[filter] duration-500 ${dimmed ? 'blur-sm brightness-50 pointer-events-none' : ''}`}>
-                        <SeatSidebar flow={flow} leftByClass={leftByClass} onBestSeats={handleBestSeats} onContinue={openCheckout} onViewSeat={(id) => goTo('seat', id)} />
+                        <SeatSidebar compact={!isWide} flow={flow} leftByClass={leftByClass} onBestSeats={handleBestSeats} onContinue={openCheckout} onViewSeat={(id) => goTo('seat', id)} />
                     </div>
                 )}
             </div>

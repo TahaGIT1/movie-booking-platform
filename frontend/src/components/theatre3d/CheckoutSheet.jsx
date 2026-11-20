@@ -133,7 +133,7 @@ export function CheckoutSheet({ pane, onPane, onClose, snackQty, onSnackChange, 
                 aria-modal="true"
                 aria-label={pane === 'snacks' ? 'Add snacks' : 'Checkout'}
                 onClick={(e) => e.stopPropagation()}
-                className="tt-sheet-in w-full sm:w-[420px] max-h-[92vh] overflow-y-auto no-scrollbar rounded-t-3xl sm:rounded-3xl border border-white/10 bg-[#0e1020]/95 backdrop-blur-2xl p-5 sm:p-6 shadow-[0_30px_80px_rgba(0,0,0,0.6)]"
+                className="tt-sheet-in w-full sm:w-[420px] max-h-full overflow-y-auto no-scrollbar rounded-t-3xl sm:rounded-3xl border border-white/10 bg-[#0e1020]/95 backdrop-blur-2xl p-5 sm:p-6 pb-[max(20px,env(safe-area-inset-bottom))] shadow-[0_30px_80px_rgba(0,0,0,0.6)]"
             >
                 <div className="flex items-start justify-between mb-4">
                     <div>

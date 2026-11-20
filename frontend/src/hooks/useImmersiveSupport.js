@@ -1,7 +1,3 @@
-import { useEffect, useState } from 'react';
-
-const MIN_3D_WIDTH = 640;
-
 let webglCache = null;
 /** True when the browser can create a WebGL context. Cached after the first probe. */
 export function hasWebGL() {
@@ -15,15 +11,11 @@ export function hasWebGL() {
     return webglCache;
 }
 
-/** Whether the immersive 3D seat picker should be offered (WebGL + not a narrow phone). */
+/**
+ * Whether the immersive 3D seat picker can be offered. Every device with WebGL gets it —
+ * phones and tablets included; the 3D page adapts its layout and camera to the screen.
+ */
 export function useImmersiveSupport() {
-    const query = `(min-width: ${MIN_3D_WIDTH}px)`;
-    const [wideEnough, setWideEnough] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
-    useEffect(() => {
-        const mql = window.matchMedia(query);
-        const onChange = (e) => setWideEnough(e.matches);
-        mql.addEventListener('change', onChange);
-        return () => mql.removeEventListener('change', onChange);
-    }, [query]);
-    return { webgl: hasWebGL(), wideEnough, supported: hasWebGL() && wideEnough };
+    const webgl = hasWebGL();
+    return { webgl, supported: webgl };
 }

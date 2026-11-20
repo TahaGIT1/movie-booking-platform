@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ChevronDown, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, CalendarClock, ChevronDown, LayoutGrid } from 'lucide-react';
 import { showSubtitleParts } from './lib/showInfo';
 
 /** Header: back, title, real show subtitle, show switcher and 2D toggle. */
@@ -9,12 +9,12 @@ export function TheatreHeader({ flow, onBack, onSwitchTo2D }) {
     const subtitle = showSubtitleParts(flow).join(' · ');
 
     return (
-        <header className="relative z-20 flex items-center gap-3 px-4 sm:px-6 h-16 border-b border-white/[0.06] bg-[#0b0d16]/90 backdrop-blur-md">
+        <header className="relative z-30 flex items-center gap-2 sm:gap-3 px-2 sm:px-6 h-14 sm:h-16 shrink-0 border-b border-white/[0.06] bg-[#0b0d16]/90 backdrop-blur-md">
             <button type="button" onClick={onBack} aria-label="Go back" className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-300 hover:bg-white/10 hover:text-white cursor-pointer">
                 <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="min-w-0 flex-1">
-                <h1 className="font-heading font-black uppercase tracking-wide text-white text-base sm:text-lg leading-tight truncate">{item.title}</h1>
+                <h1 className="font-heading font-black uppercase tracking-wide text-white text-sm sm:text-lg leading-tight truncate">{item.title}</h1>
                 <p className="text-[11px] sm:text-xs text-neutral-400 truncate">{subtitle}</p>
             </div>
 
@@ -23,13 +23,15 @@ export function TheatreHeader({ flow, onBack, onSwitchTo2D }) {
                     type="button"
                     onClick={() => setPickerOpen((o) => !o)}
                     aria-expanded={pickerOpen}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/15 bg-white/5 text-xs text-neutral-200 hover:bg-white/10 cursor-pointer"
+                    aria-label="Change show"
+                    className="inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-full border border-white/15 bg-white/5 text-xs text-neutral-200 hover:bg-white/10 cursor-pointer"
                 >
-                    Change show
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
+                    <CalendarClock className="w-4 h-4 sm:hidden" />
+                    <span className="hidden sm:inline">Change show</span>
+                    <ChevronDown className={`hidden sm:block w-3.5 h-3.5 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {pickerOpen && (
-                    <div className="absolute right-0 mt-2 w-[min(92vw,380px)] p-4 rounded-2xl border border-white/10 bg-[#111427]/95 backdrop-blur-xl shadow-2xl space-y-4">
+                    <div className="fixed inset-x-3 top-[60px] max-h-[calc(100dvh-72px)] overflow-y-auto sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[380px] sm:max-h-none p-4 rounded-2xl border border-white/10 bg-[#111427]/95 backdrop-blur-xl shadow-2xl space-y-4">
                         <label className="block">
                             <span className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Theatre</span>
                             <select
@@ -86,10 +88,11 @@ export function TheatreHeader({ flow, onBack, onSwitchTo2D }) {
                 type="button"
                 onClick={onSwitchTo2D}
                 title="Switch to the flat seat map"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/15 bg-white/5 text-xs text-neutral-300 hover:bg-white/10 cursor-pointer"
+                aria-label="Switch to the 2D seat map"
+                className="inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-full border border-white/15 bg-white/5 text-xs text-neutral-300 hover:bg-white/10 cursor-pointer"
             >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                2D map
+                <LayoutGrid className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                <span className="hidden sm:inline">2D map</span>
             </button>
         </header>
     );
