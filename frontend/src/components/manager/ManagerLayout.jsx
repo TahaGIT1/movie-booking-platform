@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api.service';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDashboardDrawer, DashboardMobileBar } from '../layout/DashboardDrawer';
 
 export const ManagerLayout = () => {
   const location = useLocation();
@@ -25,6 +26,7 @@ export const ManagerLayout = () => {
   const { user, logout } = useAuth();
   const [theatre, setTheatre] = useState(null);
   const [loading, setLoading] = useState(true);
+  const drawer = useDashboardDrawer();
 
   useEffect(() => {
     fetchTheatre();
@@ -96,7 +98,7 @@ export const ManagerLayout = () => {
   return (
     <div className="flex h-screen bg-[#07080a] text-white overflow-hidden font-sans">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#0d0f12] border-r border-white/5 flex flex-col z-20">
+      <aside className={`w-64 bg-[#0d0f12] border-r border-white/5 flex flex-col shrink-0 ${drawer.sidebarClassName}`}>
         {/* Brand & Cinema Header */}
         <div className="p-5 border-b border-white/5">
           <div className="flex items-center justify-between">
@@ -182,6 +184,7 @@ export const ManagerLayout = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#07080a]">
+        <DashboardMobileBar label="Manager" isOpen={drawer.isOpen} onOpen={drawer.open} onClose={drawer.close} />
         {/* Verification Status Warning Bar if Pending or Rejected */}
         {theatre?.status === 'PENDING' && (
           <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2.5 flex items-center justify-between text-xs text-amber-300">
@@ -229,7 +232,7 @@ export const ManagerLayout = () => {
         )}
 
         {/* Scrollable Viewport */}
-        <main className="flex-1 overflow-y-auto p-8 relative">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
           {!theatre && !loading ? (
             <div className="max-w-md mx-auto my-12 bg-neutral-900/60 border border-red-500/20 rounded-3xl p-8 text-center space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">

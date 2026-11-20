@@ -1,11 +1,14 @@
-// schema.prisma
+// schema.prisma (MongoDB via Prisma; ids are UUID strings stored in _id)
+// Optional unique fields (gstNumber, mobileNumber, gatewayTransactionId) are enforced by
+// partial unique indexes in scripts/ensure-mongo-indexes.js: a plain MongoDB unique index
+// treats every null as a duplicate.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -69,23 +72,23 @@ enum TicketScanStatus {
 }
 
 model Theatre {
-  id              String        @id @default(uuid()) @db.Uuid
-  name            String        @db.VarChar(255)
-  legalEntityName String?       @map("legal_entity_name") @db.VarChar(255)
-  gstNumber       String?       @unique @map("gst_number") @db.VarChar(32)
-  contactPhone    String?       @map("contact_phone") @db.VarChar(20)
-  contactEmail    String?       @map("contact_email") @db.VarChar(255)
+  id              String        @id @default(uuid()) @map("_id")
+  name            String       
+  legalEntityName String?       @map("legal_entity_name")
+  gstNumber       String?       @map("gst_number")
+  contactPhone    String?       @map("contact_phone")
+  contactEmail    String?       @map("contact_email")
   addressLine     String        @map("address_line")
-  city            String        @db.VarChar(100)
-  state           String        @db.VarChar(100)
-  postalCode      String?       @map("postal_code") @db.VarChar(16)
-  latitude        Decimal?      @db.Decimal(10, 8)
-  longitude       Decimal?      @db.Decimal(11, 8)
+  city            String       
+  state           String       
+  postalCode      String?       @map("postal_code")
+  latitude        Float?       
+  longitude       Float?       
   amenities       Json          @default("[]")
   status          TheatreStatus @default(PENDING)
   rejectionReason String?       @map("rejection_reason")
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
 
   users           User[]
   documents       TheatreDocument[]
@@ -99,20 +102,20 @@ model Theatre {
 }
 
 model User {
-  id                  String    @id @default(uuid()) @db.Uuid
-  theatreId           String?   @map("theatre_id") @db.Uuid
+  id                  String    @id @default(uuid()) @map("_id")
+  theatreId           String?   @map("theatre_id")
   role                UserRole  @default(CUSTOMER)
-  fullName            String    @map("full_name") @db.VarChar(128)
-  email               String    @unique @db.VarChar(255)
-  mobileNumber        String?   @unique @map("mobile_number") @db.VarChar(20)
-  passwordHash        String?   @map("password_hash") @db.VarChar(255)
+  fullName            String    @map("full_name")
+  email               String    @unique
+  mobileNumber        String?   @map("mobile_number")
+  passwordHash        String?   @map("password_hash")
   profilePhotoUrl     String?   @map("profile_photo_url")
   preferences         Json      @default("{}")
   isBlocked           Boolean   @default(false) @map("is_blocked")
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
-  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  lastLoginAt         DateTime? @map("last_login_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
 
   theatre           Theatre?          @relation(fields: [theatreId], references: [id], onDelete: SetNull)
   refreshTokens     RefreshToken[]
@@ -128,25 +131,25 @@ model User {
 }
 
 model RolePermission {
-  id         BigInt   @id @default(autoincrement())
+  id         String   @id @default(uuid()) @map("_id")
   role       UserRole
-  permission String   @db.VarChar(64)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  permission String  
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@unique([role, permission])
   @@map("roles_permissions")
 }
 
 model RefreshToken {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
+  id          String    @id @default(uuid()) @map("_id")
+  userId      String    @map("user_id")
   tokenHash   String    @unique @map("token_hash")
-  deviceLabel String?   @map("device_label") @db.VarChar(128)
+  deviceLabel String?   @map("device_label")
   userAgent   String?   @map("user_agent")
   ipAddress   String?   @map("ip_address") // changed from @db.Inet since Prisma treats it as string by default without preview features
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
-  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -154,15 +157,15 @@ model RefreshToken {
 }
 
 model TheatreDocument {
-  id                 String    @id @default(uuid()) @db.Uuid
-  theatreId          String    @map("theatre_id") @db.Uuid
-  documentType       String    @map("document_type") @db.VarChar(64)
+  id                 String    @id @default(uuid()) @map("_id")
+  theatreId          String    @map("theatre_id")
+  documentType       String    @map("document_type")
   fileUrl            String    @map("file_url")
-  verificationStatus String    @default("PENDING") @map("verification_status") @db.VarChar(32)
+  verificationStatus String    @default("PENDING") @map("verification_status")
   rejectionReason    String?   @map("rejection_reason")
-  reviewedBy         String?   @map("reviewed_by") @db.Uuid
-  reviewedAt         DateTime? @map("reviewed_at") @db.Timestamptz
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  reviewedBy         String?   @map("reviewed_by")
+  reviewedAt         DateTime? @map("reviewed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
 
   theatre  Theatre @relation(fields: [theatreId], references: [id], onDelete: Cascade)
   reviewer User?   @relation("ReviewedDocuments", fields: [reviewedBy], references: [id], onDelete: SetNull)
@@ -171,16 +174,16 @@ model TheatreDocument {
 }
 
 model Screen {
-  id               String         @id @default(uuid()) @db.Uuid
-  theatreId        String         @map("theatre_id") @db.Uuid
-  screenNumber     String         @map("screen_number") @db.VarChar(16)
-  name             String         @db.VarChar(64)
+  id               String         @id @default(uuid()) @map("_id")
+  theatreId        String         @map("theatre_id")
+  screenNumber     String         @map("screen_number")
+  name             String        
   supportedFormats VisualFormat[] @default([TWO_D]) @map("supported_formats")
-  soundSystem      String?        @map("sound_system") @db.VarChar(64)
+  soundSystem      String?        @map("sound_system")
   totalCapacity    Int            @map("total_capacity")
   isActive         Boolean        @default(true) @map("is_active")
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at")
 
   theatre Theatre @relation(fields: [theatreId], references: [id], onDelete: Cascade)
   seats   Seat[]
@@ -191,16 +194,16 @@ model Screen {
 }
 
 model Seat {
-  id           String   @id @default(uuid()) @db.Uuid
-  screenId     String   @map("screen_id") @db.Uuid
-  rowLabel     String   @map("row_label") @db.VarChar(4)
+  id           String   @id @default(uuid()) @map("_id")
+  screenId     String   @map("screen_id")
+  rowLabel     String   @map("row_label")
   seatNumber   Int      @map("seat_number")
   tier         SeatTier @default(NORMAL)
   isAccessible Boolean  @default(false) @map("is_accessible")
   isBroken     Boolean  @default(false) @map("is_broken")
   gridX        Int      @map("grid_x")
   gridY        Int      @map("grid_y")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at")
 
   screen       Screen           @relation(fields: [screenId], references: [id], onDelete: Cascade)
   showStatuses ShowSeatStatus[]
@@ -211,21 +214,21 @@ model Seat {
 }
 
 model Movie {
-  id                 String    @id @default(uuid()) @db.Uuid
-  title              String    @db.VarChar(255)
+  id                 String    @id @default(uuid()) @map("_id")
+  title              String   
   synopsis           String?
   durationMinutes    Int       @map("duration_minutes")
-  censorCertificate  String    @map("censor_certificate") @db.VarChar(8)
-  originalLanguage   String    @map("original_language") @db.VarChar(64)
-  supportedLanguages String[]  @default([]) @map("supported_languages") @db.VarChar(64)
-  genres             String[]  @default([]) @db.VarChar(64)
+  censorCertificate  String    @map("censor_certificate")
+  originalLanguage   String    @map("original_language")
+  supportedLanguages String[]  @default([]) @map("supported_languages")
+  genres             String[]  @default([])
   castMembers        Json      @default("[]") @map("cast_members")
-  director           String?   @db.VarChar(128)
+  director           String?  
   posterUrl          String?   @map("poster_url")
   trailerUrl         String?   @map("trailer_url")
-  releaseDate        DateTime? @map("release_date") @db.Date
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  releaseDate        DateTime? @map("release_date")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
 
   shows      Show[]
   coupons    Coupon[]
@@ -236,18 +239,18 @@ model Movie {
 }
 
 model Show {
-  id              String       @id @default(uuid()) @db.Uuid
-  theatreId       String       @map("theatre_id") @db.Uuid
-  screenId        String       @map("screen_id") @db.Uuid
-  movieId         String       @map("movie_id") @db.Uuid
-  startTime       DateTime     @map("start_time") @db.Timestamptz
-  endTime         DateTime     @map("end_time") @db.Timestamptz
+  id              String       @id @default(uuid()) @map("_id")
+  theatreId       String       @map("theatre_id")
+  screenId        String       @map("screen_id")
+  movieId         String       @map("movie_id")
+  startTime       DateTime     @map("start_time")
+  endTime         DateTime     @map("end_time")
   visualFormat    VisualFormat @default(TWO_D) @map("visual_format")
-  languageVersion String       @map("language_version") @db.VarChar(64)
+  languageVersion String       @map("language_version")
   baseTierPricing Json         @map("base_tier_pricing")
   isCancelled     Boolean      @default(false) @map("is_cancelled")
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at")
 
   theatre      Theatre          @relation(fields: [theatreId], references: [id], onDelete: Cascade)
   screen       Screen           @relation(fields: [screenId], references: [id], onDelete: Restrict)
@@ -261,13 +264,13 @@ model Show {
 }
 
 model ShowSeatStatus {
-  id             String     @id @default(uuid()) @db.Uuid
-  showId         String     @map("show_id") @db.Uuid
-  seatId         String     @map("seat_id") @db.Uuid
+  id             String     @id @default(uuid()) @map("_id")
+  showId         String     @map("show_id")
+  seatId         String     @map("seat_id")
   status         SeatStatus @default(AVAILABLE)
-  lockedByUserId String?    @map("locked_by_user_id") @db.Uuid
-  lockExpiresAt  DateTime?  @map("lock_expires_at") @db.Timestamptz
-  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  lockedByUserId String?    @map("locked_by_user_id")
+  lockExpiresAt  DateTime?  @map("lock_expires_at")
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at")
 
   show Show @relation(fields: [showId], references: [id], onDelete: Cascade)
   seat Seat @relation(fields: [seatId], references: [id], onDelete: Restrict)
@@ -278,15 +281,15 @@ model ShowSeatStatus {
 }
 
 model ConcessionItem {
-  id           String   @id @default(uuid()) @db.Uuid
-  theatreId    String   @map("theatre_id") @db.Uuid
-  name         String   @db.VarChar(128)
-  category     String?  @db.VarChar(64)
+  id           String   @id @default(uuid()) @map("_id")
+  theatreId    String   @map("theatre_id")
+  name         String  
+  category     String? 
   priceCents   Int      @map("price_cents")
   isVegetarian Boolean  @default(true) @map("is_vegetarian")
   imageUrl     String?  @map("image_url")
   isInStock    Boolean  @default(true) @map("is_in_stock")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at")
 
   theatre  Theatre             @relation(fields: [theatreId], references: [id], onDelete: Cascade)
   bookings BookingConcession[]
@@ -295,20 +298,20 @@ model ConcessionItem {
 }
 
 model Coupon {
-  id                 String   @id @default(uuid()) @db.Uuid
-  code               String   @unique @db.VarChar(32)
-  theatreId          String?  @map("theatre_id") @db.Uuid
-  movieId            String?  @map("movie_id") @db.Uuid
-  discountPercentage Decimal? @map("discount_percentage") @db.Decimal(5, 2)
+  id                 String   @id @default(uuid()) @map("_id")
+  code               String   @unique
+  theatreId          String?  @map("theatre_id")
+  movieId            String?  @map("movie_id")
+  discountPercentage Float?   @map("discount_percentage")
   flatDiscountAmount Int?     @map("flat_discount_amount")
   minSpendAmount     Int      @default(0) @map("min_spend_amount")
   maxDiscountCap     Int?     @map("max_discount_cap")
   totalUsageLimit    Int      @default(0) @map("total_usage_limit")
   perUserLimit       Int      @default(1) @map("per_user_limit")
   currentRedemptions Int      @default(0) @map("current_redemptions")
-  validFrom          DateTime @map("valid_from") @db.Timestamptz
-  validUntil         DateTime @map("valid_until") @db.Timestamptz
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  validFrom          DateTime @map("valid_from")
+  validUntil         DateTime @map("valid_until")
+  createdAt          DateTime @default(now()) @map("created_at")
 
   theatre  Theatre?  @relation(fields: [theatreId], references: [id], onDelete: Cascade)
   movie    Movie?    @relation(fields: [movieId], references: [id], onDelete: SetNull)
@@ -318,11 +321,11 @@ model Coupon {
 }
 
 model Booking {
-  id                   String           @id @default(uuid()) @db.Uuid
-  bookingReference     String           @unique @map("booking_reference") @db.VarChar(20)
-  userId               String           @map("user_id") @db.Uuid
-  showId               String           @map("show_id") @db.Uuid
-  couponId             String?          @map("coupon_id") @db.Uuid
+  id                   String           @id @default(uuid()) @map("_id")
+  bookingReference     String           @unique @map("booking_reference")
+  userId               String           @map("user_id")
+  showId               String           @map("show_id")
+  couponId             String?          @map("coupon_id")
   subtotalCents        Int              @map("subtotal_cents")
   convenienceFeeCents  Int              @default(0) @map("convenience_fee_cents")
   taxCents             Int              @default(0) @map("tax_cents")
@@ -331,12 +334,12 @@ model Booking {
   status               BookingStatus    @default(INITIATED)
   qrPayloadHash        String?          @map("qr_payload_hash")
   qrScanStatus         TicketScanStatus @default(UNUSED) @map("qr_scan_status")
-  scannedAt            DateTime?        @map("scanned_at") @db.Timestamptz
-  scannedByStaffId     String?          @map("scanned_by_staff_id") @db.Uuid
+  scannedAt            DateTime?        @map("scanned_at")
+  scannedByStaffId     String?          @map("scanned_by_staff_id")
   cancellationFeeCents Int              @default(0) @map("cancellation_fee_cents")
   refundAmountCents    Int              @default(0) @map("refund_amount_cents")
-  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at")
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   show        Show                @relation(fields: [showId], references: [id], onDelete: Restrict)
@@ -353,9 +356,9 @@ model Booking {
 }
 
 model BookingSeat {
-  id                  String @id @default(uuid()) @db.Uuid
-  bookingId           String @map("booking_id") @db.Uuid
-  seatId              String @map("seat_id") @db.Uuid
+  id                  String @id @default(uuid()) @map("_id")
+  bookingId           String @map("booking_id")
+  seatId              String @map("seat_id")
   allocatedPriceCents Int    @map("allocated_price_cents")
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
@@ -366,9 +369,9 @@ model BookingSeat {
 }
 
 model BookingConcession {
-  id             String @id @default(uuid()) @db.Uuid
-  bookingId      String @map("booking_id") @db.Uuid
-  itemId         String @map("item_id") @db.Uuid
+  id             String @id @default(uuid()) @map("_id")
+  bookingId      String @map("booking_id")
+  itemId         String @map("item_id")
   quantity       Int
   unitPriceCents Int    @map("unit_price_cents")
 
@@ -379,19 +382,19 @@ model BookingConcession {
 }
 
 model Payment {
-  id                   String        @id @default(uuid()) @db.Uuid
-  bookingId            String        @map("booking_id") @db.Uuid
-  gatewayName          String        @default("MOCK") @map("gateway_name") @db.VarChar(64)
-  gatewayTransactionId String?       @unique @map("gateway_transaction_id") @db.VarChar(128)
-  gatewayOrderId       String?       @map("gateway_order_id") @db.VarChar(128)
+  id                   String        @id @default(uuid()) @map("_id")
+  bookingId            String        @map("booking_id")
+  gatewayName          String        @default("MOCK") @map("gateway_name")
+  gatewayTransactionId String?       @map("gateway_transaction_id")
+  gatewayOrderId       String?       @map("gateway_order_id")
   amountCents          Int           @map("amount_cents")
-  currency             String        @default("INR") @db.VarChar(3)
-  paymentMethod        String        @map("payment_method") @db.VarChar(32)
+  currency             String        @default("INR")
+  paymentMethod        String        @map("payment_method")
   status               PaymentStatus @default(INITIATED)
-  idempotencyKey       String        @unique @map("idempotency_key") @db.Uuid
+  idempotencyKey       String        @unique @map("idempotency_key")
   gatewayResponse      Json?         @map("gateway_response_payload")
-  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at")
 
   booking Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   refunds Refund[]
@@ -401,15 +404,15 @@ model Payment {
 }
 
 model Refund {
-  id          String   @id @default(uuid()) @db.Uuid
-  bookingId   String   @map("booking_id") @db.Uuid
-  paymentId   String?  @map("payment_id") @db.Uuid
+  id          String   @id @default(uuid()) @map("_id")
+  bookingId   String   @map("booking_id")
+  paymentId   String?  @map("payment_id")
   amountCents Int      @map("amount_cents")
-  status      String   @default("PENDING") @db.VarChar(32)
+  status      String   @default("PENDING")
   reason      String?
-  providerRef String?  @map("provider_ref") @db.VarChar(128)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  providerRef String?  @map("provider_ref")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   booking Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
@@ -418,14 +421,14 @@ model Refund {
 }
 
 model Review {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  movieId     String   @map("movie_id") @db.Uuid
-  ratingScore Int      @map("rating_score") @db.SmallInt
+  id          String   @id @default(uuid()) @map("_id")
+  userId      String   @map("user_id")
+  movieId     String   @map("movie_id")
+  ratingScore Int      @map("rating_score")
   reviewText  String?  @map("review_text")
   photosUrls  String[] @map("photos_urls")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
@@ -435,27 +438,28 @@ model Review {
 }
 
 model Watchlist {
-  userId    String   @map("user_id") @db.Uuid
-  movieId   String   @map("movie_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id        String   @id @default(uuid()) @map("_id")
+  userId    String   @map("user_id")
+  movieId   String   @map("movie_id")
+  createdAt DateTime @default(now()) @map("created_at")
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
 
-  @@id([userId, movieId])
+  @@unique([userId, movieId])
   @@map("watchlist")
 }
 
 model Notification {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @map("user_id") @db.Uuid
-  type          String   @db.VarChar(64)
-  title         String   @db.VarChar(255)
+  id            String   @id @default(uuid()) @map("_id")
+  userId        String   @map("user_id")
+  type          String  
+  title         String  
   body          String?
-  relatedEntity String?  @map("related_entity") @db.VarChar(64)
-  relatedId     String?  @map("related_id") @db.Uuid
+  relatedEntity String?  @map("related_entity")
+  relatedId     String?  @map("related_id")
   isRead        Boolean  @default(false) @map("is_read")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt     DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -464,19 +468,33 @@ model Notification {
 }
 
 model AuditLog {
-  id            BigInt   @id @default(autoincrement())
-  actorId       String?  @map("actor_id") @db.Uuid
-  action        String   @db.VarChar(64)
-  targetEntity  String   @map("target_entity") @db.VarChar(64)
-  targetId      String?  @map("target_id") @db.Uuid
+  id            String   @id @default(uuid()) @map("_id")
+  actorId       String?  @map("actor_id")
+  action        String  
+  targetEntity  String   @map("target_entity")
+  targetId      String?  @map("target_id")
   ipAddress     String?  @map("ip_address")
   userAgent     String?  @map("user_agent")
   previousState Json?    @map("previous_state")
   newState      Json?    @map("new_state")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt     DateTime @default(now()) @map("created_at")
 
   actor User? @relation("AuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([actorId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+// Email OTP codes for signup / password reset (previously a raw-SQL-only table).
+model EmailOtp {
+  id        String   @id @default(uuid()) @map("_id")
+  email     String
+  code      String
+  purpose   String
+  attempts  Int      @default(0)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([email, purpose])
+  @@map("email_otps")
 }

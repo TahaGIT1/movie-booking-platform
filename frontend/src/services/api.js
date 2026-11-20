@@ -1278,28 +1278,175 @@ export const api = {
     }
   },
 
-  async getOccupiedSeats(theatre, date, time) {
+  getLocalBookings() {
     try {
-      const url = `${API_BASE_URL}/bookings/occupied-seats?theatre=${encodeURIComponent(theatre)}&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`;
-      const res = await fetch(url);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.occupiedSeats || [];
+      const raw = localStorage.getItem('tt_user_bookings');
+      return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
     }
   },
 
+  saveLocalBooking(booking) {
+    try {
+      if (!booking || !booking.orderId) return;
+      const list = this.getLocalBookings();
+      const existingIdx = list.findIndex((b) => b.orderId === booking.orderId);
+      if (existingIdx >= 0) {
+        list[existingIdx] = { ...list[existingIdx], ...booking };
+      } else {
+        list.unshift(booking);
+      }
+      localStorage.setItem('tt_user_bookings', JSON.stringify(list));
+
+      // Also persist to booked seats map
+      this.recordLocalSeats(
+        booking.theatreName,
+        booking.date,
+        booking.time,
+        booking.mediaId,
+        booking.seats || []
+      );
+    } catch (e) {
+      console.warn('Failed to save local booking:', e);
+    }
+  },
+
+  recordLocalSeats(theatre, date, time, movieId, seats = []) {
+    if (!seats || seats.length === 0) return;
+    try {
+      const raw = localStorage.getItem('tt_booked_seats_map');
+      const map = raw ? JSON.parse(raw) : {};
+      const clean = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      const keys = [
+        `${clean(theatre)}__${clean(date)}__${clean(time)}__${clean(movieId)}`,
+        `${clean(theatre)}__${clean(date)}__${clean(time)}`,
+        clean(theatre),
+      ];
+
+      keys.forEach((k) => {
+        if (!k) return;
+        const current = new Set(map[k] || []);
+        seats.forEach((s) => current.add(s));
+        map[k] = Array.from(current);
+      });
+
+      localStorage.setItem('tt_booked_seats_map', JSON.stringify(map));
+    } catch {}
+  },
+
+  getLocalBookedSeats(theatre, date, time, movieId) {
+    const found = new Set();
+    const clean = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cTheatre = clean(theatre);
+    const cDate = clean(date);
+    const cTime = clean(time);
+    const cMovie = clean(movieId);
+
+    // 1. From booked seats map
+    try {
+      const raw = localStorage.getItem('tt_booked_seats_map');
+      if (raw) {
+        const map = JSON.parse(raw);
+        const specificKey = `${cTheatre}__${cDate}__${cTime}__${cMovie}`;
+        const timeKey = `${cTheatre}__${cDate}__${cTime}`;
+        (map[specificKey] || []).forEach((s) => found.add(s));
+        (map[timeKey] || []).forEach((s) => found.add(s));
+        if (!cDate && !cTime && map[cTheatre]) {
+          (map[cTheatre] || []).forEach((s) => found.add(s));
+        }
+      }
+    } catch {}
+
+    // 2. From all local bookings
+    try {
+      const bookings = this.getLocalBookings();
+      bookings.forEach((b) => {
+        const bTheatre = clean(b.theatreName);
+        const bDate = clean(b.date);
+        const bTime = clean(b.time);
+        const bMovie = clean(b.mediaId);
+
+        const theatreMatches = !cTheatre || !bTheatre || bTheatre.includes(cTheatre) || cTheatre.includes(bTheatre);
+        const dateMatches = !cDate || !bDate || bDate.includes(cDate) || cDate.includes(bDate);
+        const timeMatches = !cTime || !bTime || bTime.includes(cTime) || cTime.includes(bTime);
+        const movieMatches = !cMovie || !bMovie || bMovie === cMovie;
+
+        if (theatreMatches && dateMatches && timeMatches && movieMatches) {
+          (b.seats || []).forEach((s) => found.add(s));
+        }
+      });
+    } catch {}
+
+    return Array.from(found);
+  },
+
+  async recordConfirmedBooking(bookingRecord) {
+    if (!bookingRecord) return;
+    this.saveLocalBooking(bookingRecord);
+
+    try {
+      await fetch(`${API_BASE_URL}/bookings/confirm`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(true),
+        body: JSON.stringify({
+          orderId: bookingRecord.orderId,
+          seats: bookingRecord.seats,
+          theatreName: bookingRecord.theatreName,
+          date: bookingRecord.date,
+          time: bookingRecord.time,
+          mediaId: bookingRecord.mediaId,
+        }),
+      }).catch(() => {});
+    } catch {}
+  },
+
+  async getOccupiedSeats(theatre, date, time, movieId = '') {
+    const localSeats = this.getLocalBookedSeats(theatre, date, time, movieId);
+    const combinedSet = new Set(['B4', 'B5', 'C6', 'C7', 'D3', 'D4', 'E4']);
+    localSeats.forEach((s) => combinedSet.add(s));
+
+    try {
+      const movieParam = movieId ? `&movieId=${encodeURIComponent(movieId)}` : '';
+      const url = `${API_BASE_URL}/bookings/occupied-seats?theatre=${encodeURIComponent(theatre || '')}&date=${encodeURIComponent(date || '')}&time=${encodeURIComponent(time || '')}${movieParam}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const serverSeats = data.occupiedSeats || [];
+        serverSeats.forEach((s) => combinedSet.add(s));
+      }
+    } catch {
+      // Offline fallback: keep local and default seats
+    }
+
+    return Array.from(combinedSet);
+  },
+
   async getBookings() {
+    const localBookings = this.getLocalBookings();
     try {
       const res = await fetch(`${API_BASE_URL}/bookings`, {
         headers: this.getAuthHeaders(),
       });
-      if (!res.ok) return [];
+      if (!res.ok) return localBookings;
       const json = await res.json();
-      return Array.isArray(json) ? json : (json.data || []);
+      const serverList = Array.isArray(json) ? json : (json.data || []);
+
+      const seen = new Set();
+      const merged = [];
+
+      [...serverList, ...localBookings].forEach((b) => {
+        const id = b.orderId || b.id;
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          merged.push(b);
+        }
+      });
+
+      return merged;
     } catch {
-      return [];
+      return localBookings;
     }
   },
 
@@ -1317,6 +1464,20 @@ export const api = {
     if (!res.ok || !data.success) {
       throw new Error(data.error?.message || data.message || 'Booking creation failed');
     }
+
+    // Persist booking and lock seats immediately into local cache
+    if (data.booking) {
+      this.saveLocalBooking(data.booking);
+    } else if (payload && payload.seats) {
+      this.recordLocalSeats(
+        payload.theatreName,
+        payload.date,
+        payload.time,
+        payload.mediaId,
+        payload.seats
+      );
+    }
+
     return data;
   },
 

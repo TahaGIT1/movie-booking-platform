@@ -85,7 +85,7 @@ export const NowShowingGrid = ({
         {filteredItems.map((item) => (<div key={item.id} className="group relative flex flex-col rounded-2xl overflow-hidden bg-[#11131c] border border-white/10 hover:border-[#f5a623]/60 transition-all duration-300 hover:-translate-y-1 shadow-xl">
             {/* Poster Image Container */}
             <div className="relative aspect-[2/3] w-full overflow-hidden bg-neutral-900">
-              <img src={item.posterImage} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" onError={(e) => {
+              <img src={item.posterImage} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" onError={(e) => {
                 e.target.src =
                     'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80';
             }}/>

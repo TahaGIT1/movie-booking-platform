@@ -1,202 +1,64 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, MapPin, AlertCircle, Loader2, ChevronRight, Tag } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, AlertCircle, Loader2, ChevronRight, Tag, Box } from 'lucide-react';
 import { api } from '../services/api';
-import { useLocationContext } from '../contexts/LocationContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useBookingFlow, formatHoldTimer } from '../hooks/useBookingFlow';
+import { useImmersiveSupport } from '../hooks/useImmersiveSupport';
+import { SeatGrid2D } from '../components/booking/SeatGrid2D';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+
+// The 3D theatre (three.js + r3f + drei) is its own chunk so other pages never pay for it.
+const Theatre3DBooking = lazy(() => import('../components/theatre3d/Theatre3DBooking'));
+
+const VIEW_PREF_KEY = 'tt_seat_view';
+
+function readViewPref() {
+    try {
+        return localStorage.getItem(VIEW_PREF_KEY);
+    } catch {
+        return null;
+    }
+}
+
+function writeViewPref(value) {
+    try {
+        localStorage.setItem(VIEW_PREF_KEY, value);
+    } catch {
+        /* storage unavailable: preference is per-visit only */
+    }
+}
+
+const Theatre3DLoading = () => (
+    <div className="fixed inset-0 z-[60] bg-[#07080d] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-9 h-9 animate-spin text-[#f5a623]" />
+        <p className="text-xs text-neutral-400 tracking-wide">Opening the auditorium…</p>
+    </div>
+);
 
 export const BookingPage = () => {
     const { movieId } = useParams();
     const navigate = useNavigate();
-    const { selectedCity, openLocationModal } = useLocationContext();
-    const { user, openAuthModal } = useAuth();
+    const flow = useBookingFlow(movieId);
+    const {
+        user, openAuthModal, selectedCity, openLocationModal, item, loading, theatres, selectedTheatre, setSelectedTheatre,
+        dates, selectedDate, setSelectedDate, availableShowtimes, selectedTime, setSelectedTime, layout, seatClasses,
+        occupiedSet, selectedSeats, toggleSeat, subtotal, holdSecondsLeft, errorMessage, isSubmitting, reserveSeats,
+    } = flow;
 
-    const [item, setItem] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [theatres, setTheatres] = useState([]);
-    const [selectedTheatre, setSelectedTheatre] = useState('');
-    const [selectedDate, setSelectedDate] = useState('');
-    const [selectedTime, setSelectedTime] = useState('');
-    const [selectedSeats, setSelectedSeats] = useState([]);
-    const [occupiedSeats, setOccupiedSeats] = useState([]);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [errorMessage, setErrorMessage] = useState(null);
+    const immersive = useImmersiveSupport();
+    const [prefers3D, setPrefers3D] = useState(() => readViewPref() !== '2d');
+    const show3D = immersive.supported && prefers3D;
 
-    // 5-Minute Seat Hold Countdown Timer
-    const [holdSecondsLeft, setHoldSecondsLeft] = useState(300);
+    const switchView = (to3D) => {
+        setPrefers3D(to3D);
+        writeViewPref(to3D ? '3d' : '2d');
+    };
 
-    // Coupon state
+    // Coupon state (classic flow)
     const [couponCode, setCouponCode] = useState('');
     const [appliedDiscount, setAppliedDiscount] = useState(0);
     const [couponMessage, setCouponMessage] = useState(null);
 
-    // Dynamic dates starting from today
-    const dates = useMemo(() => {
-        return [0, 1, 2, 3].map((offset) => {
-            const d = new Date();
-            d.setDate(d.getDate() + offset);
-            const label = offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short' });
-            const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            return { label, date: dateStr, full: `${label}, ${dateStr}` };
-        });
-    }, []);
-
-    useEffect(() => {
-        if (dates.length > 0 && !selectedDate) {
-            setSelectedDate(dates[0].full);
-        }
-    }, [dates, selectedDate]);
-
-    // Fetch real theatres from DB (filtered or prioritized by selected city)
-    useEffect(() => {
-        let isCancelled = false;
-        (async () => {
-            try {
-                const cityParam = selectedCity ? selectedCity.name : null;
-                let list = await api.getTheatres(cityParam);
-                if (!list || list.length === 0) {
-                    list = await api.getTheatres();
-                }
-                if (!isCancelled && list && list.length > 0) {
-                    setTheatres(list);
-                    setSelectedTheatre(list[0].name || list[0].id);
-                }
-            } catch (err) {
-                console.warn('Failed to load theatres:', err);
-            }
-        })();
-        return () => {
-            isCancelled = true;
-        };
-    }, [selectedCity]);
-
-    // Fetch item details strictly from DB
-    useEffect(() => {
-        if (!movieId) return;
-        let isCancelled = false;
-        (async () => {
-            setLoading(true);
-            try {
-                const movie = await api.getMovieById(movieId);
-                if (movie && !isCancelled) {
-                    setItem(movie);
-                    return;
-                }
-                const event = await api.getEventById(movieId);
-                if (event && !isCancelled) {
-                    setItem(event);
-                    return;
-                }
-            } catch (err) {
-                console.warn('Failed to load item from DB:', err);
-            } finally {
-                if (!isCancelled) setLoading(false);
-            }
-        })();
-        return () => {
-            isCancelled = true;
-        };
-    }, [movieId]);
-
-    // Compute available showtimes from DB shows or sensible schedule
-    const availableShowtimes = useMemo(() => {
-        const theatreObj = theatres.find((t) => t.name === selectedTheatre || t.id === selectedTheatre);
-        if (theatreObj?.screens) {
-            const shows = theatreObj.screens.flatMap((s) => s.shows || []);
-            const movieShows = shows.filter((sh) => !sh.isCancelled && (sh.movieId === movieId || !movieId));
-            if (movieShows.length > 0) {
-                return Array.from(new Set(movieShows.map((sh) => {
-                    const d = new Date(sh.startTime);
-                    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                })));
-            }
-        }
-        return ['11:30 AM', '02:45 PM', '06:30 PM', '09:45 PM'];
-    }, [theatres, selectedTheatre, movieId]);
-
-    useEffect(() => {
-        if (availableShowtimes.length > 0 && (!selectedTime || !availableShowtimes.includes(selectedTime))) {
-            setSelectedTime(availableShowtimes[0]);
-        }
-    }, [availableShowtimes, selectedTime]);
-
-    // Fetch real occupied seats whenever showtime or theatre changes
-    useEffect(() => {
-        if (!selectedTheatre || !selectedDate || !selectedTime) return;
-        let isMounted = true;
-        (async () => {
-            try {
-                const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime);
-                if (isMounted) {
-                    setOccupiedSeats(seats || []);
-                    setSelectedSeats((prev) => prev.filter((s) => !seats.includes(s)));
-                }
-            } catch (err) {
-                console.warn('Failed to load occupied seats:', err);
-            }
-        })();
-        return () => {
-            isMounted = false;
-        };
-    }, [selectedTheatre, selectedDate, selectedTime]);
-
-    // Countdown timer effect when seats are selected
-    useEffect(() => {
-        if (selectedSeats.length === 0) {
-            setHoldSecondsLeft(300);
-            return;
-        }
-        const timer = setInterval(() => {
-            setHoldSecondsLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    api.releaseSeats('show-live', selectedSeats);
-                    setSelectedSeats([]);
-                    setErrorMessage('Your 5-minute seat hold expired. Please re-select your seats.');
-                    return 300;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [selectedSeats]);
-
-    const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
-    const cols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-    const getSeatTier = (row) => {
-        if (row === 'A' || row === 'B') {
-            return { tier: 'Standard', price: 38.0, colorClass: 'border-blue-500/30' };
-        }
-        if (row === 'C' || row === 'D') {
-            return { tier: 'Premium', price: 48.0, colorClass: 'border-purple-500/30' };
-        }
-        return { tier: 'VIP Recliner', price: 65.0, colorClass: 'border-[#f5a623]/30' };
-    };
-
-    const toggleSeat = async (seatId) => {
-        if (occupiedSeats.includes(seatId)) return;
-        setErrorMessage(null);
-        let updated;
-        if (selectedSeats.includes(seatId)) {
-            updated = selectedSeats.filter((s) => s !== seatId);
-        } else {
-            updated = [...selectedSeats, seatId];
-        }
-        setSelectedSeats(updated);
-        if (updated.length > 0) {
-            setHoldSecondsLeft(300);
-            await api.lockSeats('show-live', updated);
-        } else {
-            await api.releaseSeats('show-live', selectedSeats);
-        }
-    };
-
-    // Calculate dynamic total amount based on tiers
-    const subtotal = selectedSeats.reduce((sum, seatId) => {
-        const row = seatId.charAt(0);
-        return sum + getSeatTier(row).price;
-    }, 0);
     const discountAmount = (subtotal * appliedDiscount) / 100;
     const totalAmount = Math.max(0, subtotal - discountAmount);
 
@@ -232,88 +94,30 @@ export const BookingPage = () => {
     };
 
     const handleConfirmBooking = async () => {
-        if (selectedSeats.length === 0) return;
-
-        // Strict Requirement: User must be signed in to book tickets
-        if (!user) {
-            sessionStorage.setItem('tt_pending_booking', JSON.stringify({
-                movieId,
-                theatre: selectedTheatre,
-                date: selectedDate,
-                time: selectedTime,
-                seats: selectedSeats,
-            }));
-            setErrorMessage('Please sign in or create an account to reserve your tickets. Your seat selection is preserved.');
-            openAuthModal('login');
-            return;
-        }
-
-        setIsSubmitting(true);
-        setErrorMessage(null);
         try {
-            const response = await api.createBooking({
-                mediaId: item.id,
-                theatreName: selectedTheatre,
-                date: selectedDate,
-                time: selectedTime,
-                seats: selectedSeats,
-                totalAmount,
-                customerName: user.fullName || user.email || 'Ticket Total Customer',
-                customerEmail: user.email || 'customer@tickettotal.com',
-            });
-            if (response.success && response.booking) {
-                sessionStorage.removeItem('tt_pending_booking');
-                navigate('/payment', {
-                    state: {
-                        booking: {
-                            orderId: response.booking.orderId,
-                            mediaId: response.booking.mediaId,
-                            theatreName: response.booking.theatreName,
-                            date: response.booking.date,
-                            time: response.booking.time,
-                            seats: response.booking.seats,
-                            totalAmount: response.booking.totalAmount,
-                            title: response.booking.title,
-                            posterImage: response.booking.posterImage,
-                        },
-                    },
-                });
-            } else {
-                throw new Error(response.error || 'Failed to confirm booking');
-            }
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : 'An error occurred during booking';
-            setErrorMessage(msg);
-            const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime);
-            setOccupiedSeats(seats);
-        } finally {
-            setIsSubmitting(false);
+            const booking = await reserveSeats({ totalAmount, rememberPending: true });
+            if (booking) navigate('/payment', { state: { booking } });
+        } catch {
+            /* error message is surfaced by the hook */
         }
     };
 
-    // Auto-resume booking flow once the user logs in
+    // Auto-resume the classic flow once the user logs in
     useEffect(() => {
-        if (!user) return;
+        if (!user || show3D) return;
         const saved = sessionStorage.getItem('tt_pending_booking');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (parsed.movieId === movieId && selectedSeats.length > 0 && !isSubmitting) {
-                    sessionStorage.removeItem('tt_pending_booking');
-                    setErrorMessage(null);
-                    handleConfirmBooking();
-                }
-            } catch {
+        if (!saved) return;
+        try {
+            const parsed = JSON.parse(saved);
+            if (parsed.movieId === movieId && selectedSeats.length > 0 && !isSubmitting) {
                 sessionStorage.removeItem('tt_pending_booking');
+                handleConfirmBooking();
             }
+        } catch {
+            sessionStorage.removeItem('tt_pending_booking');
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, movieId, selectedSeats]);
-
-    const formatTimer = (totalSeconds) => {
-        const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-        const s = (totalSeconds % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
 
     if (loading) {
         return (
@@ -331,9 +135,7 @@ export const BookingPage = () => {
                     <AlertCircle className="w-6 h-6" />
                 </div>
                 <h2 className="text-xl font-heading font-bold text-white">Movie Not Found</h2>
-                <p className="text-xs text-neutral-400">
-                    This movie or event does not exist in the database.
-                </p>
+                <p className="text-xs text-neutral-400">This movie or event does not exist in the database.</p>
                 <Link to="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#f5a623] text-black font-semibold text-xs transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to Discovery</span>
@@ -342,15 +144,37 @@ export const BookingPage = () => {
         );
     }
 
+    if (show3D) {
+        return (
+            <ErrorBoundary>
+                <Suspense fallback={<Theatre3DLoading />}>
+                    <Theatre3DBooking flow={flow} onSwitchTo2D={() => switchView(false)} />
+                </Suspense>
+            </ErrorBoundary>
+        );
+    }
+
     return (
         <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-10 max-w-[1200px] mx-auto">
             {/* Top Breadcrumb */}
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex items-center justify-between gap-3">
                 <Link to="/" className="inline-flex items-center gap-2 text-xs font-medium text-neutral-400 hover:text-white transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to Discovery</span>
                 </Link>
-                <span className="text-xs text-neutral-500 font-mono">STEP 1 OF 2: SEATS &amp; VENUE</span>
+                <div className="flex items-center gap-3">
+                    {immersive.supported && (
+                        <button
+                            type="button"
+                            onClick={() => switchView(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-teal-400/40 bg-teal-400/10 text-teal-300 text-[11px] font-semibold hover:bg-teal-400/20 cursor-pointer"
+                        >
+                            <Box className="w-3.5 h-3.5" />
+                            3D theatre view
+                        </button>
+                    )}
+                    <span className="text-xs text-neutral-500 font-mono hidden sm:inline">STEP 1 OF 2: SEATS &amp; VENUE</span>
+                </div>
             </div>
 
             <div className="bg-[#11131c] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-8">
@@ -360,9 +184,7 @@ export const BookingPage = () => {
                         <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#f5a623]/20 text-[#f5a623] border border-[#f5a623]/30 tracking-wider">
                             CINEMA BOOKING
                         </span>
-                        <h1 className="text-2xl sm:text-3xl font-heading font-black text-white mt-1">
-                            {item.title}
-                        </h1>
+                        <h1 className="text-2xl sm:text-3xl font-heading font-black text-white mt-1">{item.title}</h1>
                         <p className="text-xs text-neutral-400 mt-1">
                             {item.genre} • {item.formats?.join(', ') || 'Standard HD'}
                         </p>
@@ -376,27 +198,14 @@ export const BookingPage = () => {
 
                 {/* Seat Hold Timer Banner */}
                 {selectedSeats.length > 0 && (
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs sm:text-sm animate-in fade-in duration-200">
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs sm:text-sm">
                         <div className="flex items-center gap-2.5 text-amber-300">
                             <Clock className="w-4 h-4 animate-pulse text-[#f5a623]" />
                             <span>
                                 <strong>Seats Reserved:</strong> Complete checkout within{' '}
-                                <span className="font-mono font-bold text-white text-base">
-                                    {formatTimer(holdSecondsLeft)}
-                                </span>
+                                <span className="font-mono font-bold text-white text-base">{formatHoldTimer(holdSecondsLeft)}</span>
                             </span>
                         </div>
-                        <span className="text-[11px] text-amber-200/70 hidden sm:inline">
-                            PostgreSQL Row Lock Active
-                        </span>
-                    </div>
-                )}
-
-                {/* Error notification */}
-                {errorMessage && (
-                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-3 text-red-400 text-sm">
-                        <AlertCircle className="w-5 h-5 shrink-0" />
-                        <span>{errorMessage}</span>
                     </div>
                 )}
 
@@ -408,11 +217,7 @@ export const BookingPage = () => {
                                 <MapPin className="w-3.5 h-3.5 text-[#f5a623]" />
                                 Select Cinema Theatre
                             </label>
-                            <button
-                                type="button"
-                                onClick={openLocationModal}
-                                className="text-[11px] text-[#f5a623] hover:underline flex items-center gap-1 cursor-pointer"
-                            >
+                            <button type="button" onClick={openLocationModal} className="text-[11px] text-[#f5a623] hover:underline flex items-center gap-1 cursor-pointer">
                                 <span>City: {selectedCity ? selectedCity.name : 'All'}</span>
                                 <span className="opacity-70">(Change)</span>
                             </button>
@@ -433,9 +238,7 @@ export const BookingPage = () => {
                                 })}
                             </select>
                         ) : (
-                            <div className="p-3 text-xs text-neutral-400 bg-white/5 border border-white/10 rounded-xl">
-                                No theatres found in database
-                            </div>
+                            <div className="p-3 text-xs text-neutral-400 bg-white/5 border border-white/10 rounded-xl">No theatres found in database</div>
                         )}
                     </div>
 
@@ -492,76 +295,8 @@ export const BookingPage = () => {
                     </div>
                 </div>
 
-                {/* Interactive Seat Matrix */}
-                <div className="pt-4 border-t border-white/10">
-                    <div className="w-3/4 max-w-md mx-auto mb-8 text-center">
-                        <div className="h-1.5 w-full bg-gradient-to-r from-transparent via-[#f5a623] to-transparent rounded-full shadow-[0_0_15px_#f5a623]" />
-                        <span className="text-[11px] uppercase font-mono tracking-widest text-neutral-500 mt-2 block">
-                            AUDITORIUM SCREEN
-                        </span>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-2.5 overflow-x-auto pb-4">
-                        {rows.map((row) => {
-                            const tierInfo = getSeatTier(row);
-                            return (
-                                <div key={row} className="flex items-center gap-2">
-                                    <span className="w-4 text-xs font-mono text-neutral-500 text-center font-bold">
-                                        {row}
-                                    </span>
-                                    <div className="flex gap-2">
-                                        {cols.map((col) => {
-                                            const seatId = `${row}${col}`;
-                                            const isOccupied = occupiedSeats.includes(seatId);
-                                            const isSelected = selectedSeats.includes(seatId);
-                                            return (
-                                                <button
-                                                    key={seatId}
-                                                    disabled={isOccupied}
-                                                    onClick={() => toggleSeat(seatId)}
-                                                    title={`${row}${col} - ${tierInfo.tier} (₹ ${tierInfo.price})`}
-                                                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-all ${
-                                                        isOccupied
-                                                            ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed border border-white/5'
-                                                            : isSelected
-                                                            ? 'bg-[#f5a623] text-black shadow-[0_0_10px_#f5a623] cursor-pointer ring-2 ring-[#f5a623]/50'
-                                                            : `bg-white/10 hover:bg-white/20 text-neutral-300 border ${tierInfo.colorClass} cursor-pointer`
-                                                    }`}
-                                                >
-                                                    {col}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Seat legend with tiers */}
-                    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 mt-6 text-xs text-neutral-400">
-                        <div className="flex items-center gap-2">
-                            <div className="w-3.5 h-3.5 rounded bg-white/10 border border-blue-500/40" />
-                            <span>Standard (₹ 380)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3.5 h-3.5 rounded bg-white/10 border border-purple-500/40" />
-                            <span>Premium (₹ 480)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3.5 h-3.5 rounded bg-white/10 border border-[#f5a623]/50" />
-                            <span>VIP Recliner (₹ 650)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3.5 h-3.5 rounded bg-[#f5a623]" />
-                            <span className="text-white font-medium">Selected</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3.5 h-3.5 rounded bg-neutral-800 border border-white/5" />
-                            <span>Booked</span>
-                        </div>
-                    </div>
-                </div>
+                {/* Seat map generated from the shared auditorium layout */}
+                <SeatGrid2D layout={layout} seatClasses={seatClasses} occupiedSet={occupiedSet} selectedSeats={selectedSeats} onToggle={toggleSeat} />
 
                 {/* Coupon Code Section */}
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -577,10 +312,7 @@ export const BookingPage = () => {
                             placeholder="Enter coupon"
                             className="bg-black/40 border border-white/15 focus:border-[#f5a623] rounded-lg px-3 py-1.5 text-xs text-white uppercase outline-none"
                         />
-                        <button
-                            type="submit"
-                            className="px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/15 transition-colors cursor-pointer"
-                        >
+                        <button type="submit" className="px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/15 transition-colors cursor-pointer">
                             Apply
                         </button>
                     </form>
@@ -595,11 +327,7 @@ export const BookingPage = () => {
                             <span>{errorMessage}</span>
                         </div>
                         {!user && (
-                            <button
-                                type="button"
-                                onClick={() => openAuthModal('login')}
-                                className="px-3 py-1.5 rounded-lg bg-[#f5a623] hover:bg-[#e09612] text-black font-bold text-xs shrink-0 transition-colors cursor-pointer"
-                            >
+                            <button type="button" onClick={() => openAuthModal('login')} className="px-3 py-1.5 rounded-lg bg-[#f5a623] hover:bg-[#e09612] text-black font-bold text-xs shrink-0 transition-colors cursor-pointer">
                                 Sign In Now
                             </button>
                         )}
@@ -612,11 +340,7 @@ export const BookingPage = () => {
                             <span className="font-bold text-[#f5a623]">🔒 Sign In Required:</span>
                             <span>Please log in to finalize your seat reservation and generate your ticket.</span>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => openAuthModal('login')}
-                            className="text-[#f5a623] hover:text-white font-bold underline transition-colors cursor-pointer"
-                        >
+                        <button type="button" onClick={() => openAuthModal('login')} className="text-[#f5a623] hover:text-white font-bold underline transition-colors cursor-pointer">
                             Sign In
                         </button>
                     </div>
@@ -626,15 +350,8 @@ export const BookingPage = () => {
                 <div className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
                         <div className="text-xs text-neutral-400">
-                            Selected Seats:{' '}
-                            <span className="text-white font-semibold">
-                                {selectedSeats.join(', ') || 'None selected'}
-                            </span>
-                            {appliedDiscount > 0 && (
-                                <span className="ml-2 text-emerald-400 font-bold">
-                                    ({appliedDiscount}% OFF Applied)
-                                </span>
-                            )}
+                            Selected Seats: <span className="text-white font-semibold">{selectedSeats.join(', ') || 'None selected'}</span>
+                            {appliedDiscount > 0 && <span className="ml-2 text-emerald-400 font-bold">({appliedDiscount}% OFF Applied)</span>}
                             {user && (
                                 <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-medium">
                                     ✓ Booking as {user.fullName || user.email}
@@ -643,11 +360,7 @@ export const BookingPage = () => {
                         </div>
                         <div className="text-xl font-heading font-black text-[#f5a623] mt-0.5 flex items-baseline gap-2">
                             <span>₹ {totalAmount.toFixed(2)}</span>
-                            {appliedDiscount > 0 && (
-                                <span className="text-xs text-neutral-400 line-through">
-                                    ₹ {subtotal.toFixed(2)}
-                                </span>
-                            )}
+                            {appliedDiscount > 0 && <span className="text-xs text-neutral-400 line-through">₹ {subtotal.toFixed(2)}</span>}
                         </div>
                     </div>
 
@@ -661,14 +374,9 @@ export const BookingPage = () => {
                                 <Loader2 className="w-4 h-4 animate-spin" />
                                 <span>Reserving with Backend...</span>
                             </>
-                        ) : !user ? (
-                            <>
-                                <span>Sign In to Reserve &amp; Pay</span>
-                                <ChevronRight className="w-4 h-4" />
-                            </>
                         ) : (
                             <>
-                                <span>Reserve Seats &amp; Continue to Payment</span>
+                                <span>{user ? 'Reserve Seats & Continue to Payment' : 'Sign In to Reserve & Pay'}</span>
                                 <ChevronRight className="w-4 h-4" />
                             </>
                         )}

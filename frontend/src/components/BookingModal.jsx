@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Calendar, MapPin, Clock, Ticket, Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useLocationContext } from '../contexts/LocationContext';
 import { useAuth } from '../contexts/AuthContext';
 
 export const BookingModal = ({ item, onClose }) => {
+    const navigate = useNavigate();
+    // Movies get the full seat-selection page (immersive 3D theatre with 2D fallback).
+    const isMovie = Boolean(item) && (item.category || 'movie') === 'movie';
+    useEffect(() => {
+        if (!isMovie) return;
+        onClose?.();
+        navigate(`/book/${encodeURIComponent(item.id)}`);
+    }, [isMovie, item?.id, navigate, onClose]);
     const { selectedCity, openLocationModal } = useLocationContext();
     const { user, openAuthModal } = useAuth();
     const [theatres, setTheatres] = useState([]);
@@ -88,7 +97,7 @@ export const BookingModal = ({ item, onClose }) => {
         let isMounted = true;
         (async () => {
             try {
-                const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime);
+                const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime, item?.id);
                 if (isMounted) {
                     setOccupiedSeats(seats || []);
                     setSelectedSeats((prev) => prev.filter((s) => !seats.includes(s)));
@@ -100,9 +109,9 @@ export const BookingModal = ({ item, onClose }) => {
         return () => {
             isMounted = false;
         };
-    }, [selectedTheatre, selectedDate, selectedTime]);
+    }, [selectedTheatre, selectedDate, selectedTime, item?.id]);
 
-    if (!item) return null;
+    if (!item || isMovie) return null;
 
     // 6 rows x 10 cols seat matrix
     const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -146,6 +155,8 @@ export const BookingModal = ({ item, onClose }) => {
             });
             if (response.success && response.booking) {
                 setConfirmedBooking(response.booking);
+                setOccupiedSeats((prev) => Array.from(new Set([...prev, ...selectedSeats])));
+                setSelectedSeats([]);
                 setStep('confirmed');
             } else {
                 throw new Error(response.error || 'Failed to complete booking');
@@ -153,7 +164,7 @@ export const BookingModal = ({ item, onClose }) => {
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Reservation failed';
             setErrorMessage(msg);
-            const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime);
+            const seats = await api.getOccupiedSeats(selectedTheatre, selectedDate, selectedTime, item?.id);
             setOccupiedSeats(seats);
         } finally {
             setIsSubmitting(false);

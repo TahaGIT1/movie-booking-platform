@@ -53,6 +53,8 @@ export const MovieCard = forwardRef(({
         <img
           src={poster}
           alt={item.title || 'Event'}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {
             e.target.src = `https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80`;

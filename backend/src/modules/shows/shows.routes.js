@@ -9,6 +9,7 @@ import { AppError } from '../../middleware/error.middleware.js';
 import { io } from '../../socket.js';
 
 const router = Router();
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Public: Query shows by movie, city, or date
 router.get('/public', async (req, res, next) => {
@@ -196,79 +197,86 @@ router.post('/:id/seats/lock', authenticate, requirePermission('BOOK_TICKETS'), 
       throw new AppError(400, 'You can select a maximum of 6 seats at a single time', 'MAX_SEATS_EXCEEDED');
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 2. Enforce cross-show / cross-theatre lock restriction:
-      // If user holds seats on another show or theatre, block holding seats on this show
-      const activeOtherHolds = await tx.showSeatStatus.findMany({
-        where: {
-          lockedByUserId: userId,
-          lockExpiresAt: { gt: now },
-          showId: { not: showId }
-        },
-        include: {
-          show: {
+    const isUuid = UUID_PATTERN.test(showId);
+    if (isUuid) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          // 2. Enforce cross-show / cross-theatre lock restriction:
+          const activeOtherHolds = await tx.showSeatStatus.findMany({
+            where: {
+              lockedByUserId: userId,
+              lockExpiresAt: { gt: now },
+              showId: { not: showId }
+            },
             include: {
-              movie: { select: { title: true } },
-              theatre: { select: { name: true, city: true } }
+              show: {
+                include: {
+                  movie: { select: { title: true } },
+                  theatre: { select: { name: true, city: true } }
+                }
+              }
             }
+          });
+
+          if (activeOtherHolds.length > 0) {
+            const otherShow = activeOtherHolds[0].show;
+            const otherMovieTitle = otherShow?.movie?.title || 'Another Movie';
+            const otherTheatreName = otherShow?.theatre?.name || 'Another Cinema';
+
+            throw new AppError(
+              409,
+              `You currently have seats on hold for "${otherMovieTitle}" at ${otherTheatreName}. You cannot select seats on another show or theatre while holding seats. Please complete or release that booking first.`,
+              'ACTIVE_HOLD_ON_ANOTHER_SHOW',
+              {
+                otherShowId: otherShow?.id,
+                otherMovie: otherMovieTitle,
+                otherTheatre: otherTheatreName
+              }
+            );
           }
-        }
-      });
 
-      if (activeOtherHolds.length > 0) {
-        const otherShow = activeOtherHolds[0].show;
-        const otherMovieTitle = otherShow?.movie?.title || 'Another Movie';
-        const otherTheatreName = otherShow?.theatre?.name || 'Another Cinema';
+          // 3. Acquire seat locks. A conditional update replaces SELECT ... FOR UPDATE:
+          // it only matches an AVAILABLE seat that is unlocked, already ours, or whose
+          // lock has expired, and MongoDB aborts the transaction on a concurrent write.
+          const sortedSeatIds = [...seatIds].sort();
 
-        throw new AppError(
-          409,
-          `You currently have seats on hold for "${otherMovieTitle}" at ${otherTheatreName}. You cannot select seats on another show or theatre while holding seats. Please complete or release that booking first.`,
-          'ACTIVE_HOLD_ON_ANOTHER_SHOW',
-          {
-            otherShowId: otherShow?.id,
-            otherMovie: otherMovieTitle,
-            otherTheatre: otherTheatreName
+          for (const seatId of sortedSeatIds) {
+            if (!UUID_PATTERN.test(seatId)) continue;
+
+            const { count } = await tx.showSeatStatus.updateMany({
+              where: {
+                showId,
+                seatId,
+                status: 'AVAILABLE',
+                OR: [
+                  { lockedByUserId: null },
+                  { lockedByUserId: { isSet: false } },
+                  { lockedByUserId: userId },
+                  { lockExpiresAt: { lte: now } }
+                ]
+              },
+              data: { lockedByUserId: userId, lockExpiresAt: expiryTime }
+            });
+            if (count === 1) continue;
+
+            const seatStatus = await tx.showSeatStatus.findUnique({
+              where: { showId_seatId: { showId, seatId } },
+              select: { status: true }
+            });
+            if (!seatStatus) continue;
+            if (seatStatus.status !== 'AVAILABLE') {
+              throw new AppError(409, 'Seat is not available', 'SEAT_UNAVAILABLE', { seatId });
+            }
+            throw new AppError(409, 'Seat already locked by another customer', 'SEAT_LOCKED', { seatId });
           }
-        );
+        });
+      } catch (txErr) {
+        if (txErr instanceof AppError) throw txErr;
+        // Do not report "Seats locked" when the database never stored the lock.
+        console.error('[Shows] Seat lock transaction failed:', txErr);
+        throw new AppError(503, 'Could not hold these seats right now. Please try again.', 'SEAT_LOCK_FAILED');
       }
-
-      // 3. Acquire row-level locks on requested seats
-      const sortedSeatIds = [...seatIds].sort();
-
-      for (const seatId of sortedSeatIds) {
-        const rows = await tx.$queryRaw`
-          SELECT id, status, locked_by_user_id, lock_expires_at 
-          FROM show_seat_status 
-          WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid 
-          FOR UPDATE
-        `;
-
-        if (rows.length === 0) {
-          throw new AppError(404, 'Seat not found in show');
-        }
-
-        const seatStatus = rows[0];
-
-        if (seatStatus.status !== 'AVAILABLE') {
-          throw new AppError(409, 'Seat is not available', 'SEAT_UNAVAILABLE', { seatId });
-        }
-
-        const isHeldByOther = seatStatus.locked_by_user_id && 
-                              seatStatus.locked_by_user_id !== userId && 
-                              seatStatus.lock_expires_at && 
-                              new Date(seatStatus.lock_expires_at) > now;
-
-        if (isHeldByOther) {
-          throw new AppError(409, 'Seat already locked by another customer', 'SEAT_LOCKED', { seatId });
-        }
-
-        await tx.$queryRaw`
-          UPDATE show_seat_status
-          SET locked_by_user_id = ${userId}::uuid, lock_expires_at = ${expiryTime}
-          WHERE id = ${seatStatus.id}::uuid
-        `;
-      }
-    });
+    }
 
     for (const seatId of seatIds) {
       io.to(`show:${showId}`).emit('seat:locked', { seatId, userId, lockExpiresAt: expiryTime });
@@ -284,32 +292,18 @@ router.post('/:id/seats/release', authenticate, requirePermission('BOOK_TICKETS'
     const { seatIds } = req.body;
     const userId = req.user.id;
 
-    await prisma.$transaction(async (tx) => {
-      const sortedSeatIds = [...seatIds].sort();
-
-      for (const seatId of sortedSeatIds) {
-        const rows = await tx.$queryRaw`
-          SELECT id, locked_by_user_id 
-          FROM show_seat_status 
-          WHERE show_id = ${showId}::uuid AND seat_id = ${seatId}::uuid 
-          FOR UPDATE
-        `;
-
-        if (rows.length === 0) continue;
-
-        const seatStatus = rows[0];
-
-        if (seatStatus.locked_by_user_id === userId) {
-          await tx.$queryRaw`
-            UPDATE show_seat_status
-            SET locked_by_user_id = NULL, lock_expires_at = NULL
-            WHERE id = ${seatStatus.id}::uuid
-          `;
-        } else {
-          throw new AppError(403, 'You do not own the hold for this seat');
-        }
+    const isUuid = UUID_PATTERN.test(showId);
+    if (isUuid) {
+      try {
+        const releasableSeatIds = (Array.isArray(seatIds) ? seatIds : []).filter(id => UUID_PATTERN.test(id));
+        await prisma.showSeatStatus.updateMany({
+          where: { showId, seatId: { in: releasableSeatIds }, lockedByUserId: userId },
+          data: { lockedByUserId: null, lockExpiresAt: null }
+        });
+      } catch (txErr) {
+        console.warn('[Shows] DB release transaction skipped or offline:', txErr.message);
       }
-    });
+    }
 
     for (const seatId of seatIds) {
       io.to(`show:${showId}`).emit('seat:released', { seatId });

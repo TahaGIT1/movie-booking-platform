@@ -38,17 +38,21 @@ const CATEGORIES = [
 ];
 
 /**
- * Single Event Card with Autoplaying Video Preview & Poster Fallback
+ * Single Event Card with Hover Video Preview & Poster Fallback
+ * Only loads/plays video on hover to prevent CPU/GPU saturation from dozens of simultaneous video decoders.
  */
 const EventCard = ({ event }) => {
+  const [isHovered, setIsHovered] = useState(false);
   const videoRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current) {
+    if (isHovered && videoRef.current) {
       videoRef.current.muted = true;
       videoRef.current.play().catch(() => {});
+    } else if (!isHovered && videoRef.current) {
+      videoRef.current.pause();
     }
-  }, [event.videoUrl]);
+  }, [isHovered]);
 
   const bookingLink = event.ticketUrl || event.primaryAction?.link || `/events/${event.id}`;
   const isExternal = Boolean(event.ticketUrl || event.primaryAction?.external);
@@ -56,13 +60,59 @@ const EventCard = ({ event }) => {
   // Format date display
   const displayDate = event.dateLabel || event.date || 'Upcoming';
 
+  const getEventPoster = (ev) => {
+    const raw = ev.posterImage || ev.backdropImage;
+    const isBad = !raw || 
+      typeof raw !== 'string' || 
+      raw.includes('o2_assets') || 
+      raw.includes('edition_assets') || 
+      raw.includes('7578f6353195a792b3526f691287be4a1742904947') ||
+      raw.includes('fb7a705e0ecb73494655f6a082a898be1742905087') ||
+      raw.includes('c14de0ff254f0cac2316900cbeb5ca4e1742906714') ||
+      raw.includes('21ebc1fe6df75df6159d00e9ab651d681742906748');
+
+    if (!isBad) return raw;
+
+    const cat = (ev.category || '').toLowerCase();
+    const title = (ev.title || '').toLowerCase();
+
+    if (title.includes('samay') || title.includes('raina') || title.includes('zeroo') || title.includes('kapruwan')) {
+      return 'https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=800&auto=format&fit=crop&q=80';
+    }
+    if (title.includes('zakir')) {
+      return 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&auto=format&fit=crop&q=80';
+    }
+    if (title.includes('bassi') || title.includes('kenny') || title.includes('kanan')) {
+      return 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=800&auto=format&fit=crop&q=80';
+    }
+    if (title.includes('hauz khas') || title.includes('south delhi') || title.includes('vyatha') || title.includes('lineup')) {
+      return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80';
+    }
+    if (title.includes('diljit') || title.includes('arijit') || title.includes('kuhad') || title.includes('divine')) {
+      return 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800&auto=format&fit=crop&q=80';
+    }
+    if (title.includes('sunburn') || title.includes('hilltop') || cat.includes('festival')) {
+      return 'https://images.unsplash.com/photo-1468359601543-843bfaef291a?w=800&auto=format&fit=crop&q=80';
+    }
+    if (cat.includes('theatre') || cat.includes('art')) {
+      return 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=800&auto=format&fit=crop&q=80';
+    }
+    if (cat.includes('music') || cat.includes('concert')) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80';
+    }
+
+    return 'https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=800&auto=format&fit=crop&q=80';
+  };
+
   return (
     <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className="group relative flex-none w-[280px] sm:w-[320px] md:w-[340px] flex flex-col rounded-2xl overflow-hidden bg-[#11131c] border border-white/10 hover:border-[#f5a623]/60 transition-all duration-300 hover:-translate-y-1.5 shadow-xl hover:shadow-[#f5a623]/10"
     >
-      {/* Media Container: 16:10 Ratio with Autoplaying Looping Video */}
+      {/* Media Container: 16:10 Ratio */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-900 select-none">
-        {event.videoUrl ? (
+        {isHovered && event.videoUrl ? (
           <video
             ref={videoRef}
             src={event.videoUrl}
@@ -70,15 +120,19 @@ const EventCard = ({ event }) => {
             muted
             loop
             playsInline
-            preload="auto"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            preload="none"
+            className="w-full h-full object-cover transition-transform duration-500 scale-105"
           />
         ) : (
           <img
-            src={event.posterImage || event.backdropImage || '/images/events/events_hero.jpg'}
+            src={getEventPoster(event)}
             alt={event.title}
             loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            onError={(e) => {
+              e.target.src = 'https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=800&auto=format&fit=crop&q=80';
+            }}
           />
         )}
 
@@ -100,8 +154,8 @@ const EventCard = ({ event }) => {
         {/* Live video indicator pill */}
         {event.videoUrl && (
           <div className="absolute bottom-2.5 left-3 pointer-events-none z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-emerald-500/30 text-[9px] font-bold text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>LIVE PREVIEW</span>
+            <span className={`w-1.5 h-1.5 rounded-full bg-emerald-400 ${isHovered ? 'animate-pulse' : ''}`} />
+            <span>{isHovered ? 'LIVE PREVIEW' : 'HOVER TO PREVIEW'}</span>
           </div>
         )}
       </div>
@@ -179,16 +233,19 @@ export const UpcomingEventsSection = () => {
   const scrollLeftRef = useRef(0);
   const hasDraggedRef = useRef(false);
 
-  // Update scroll navigation states (canScrollLeft, canScrollRight, progress)
+  // Update scroll navigation states (canScrollLeft, canScrollRight, progress) without redundant re-renders
   const updateScrollState = () => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanScrollLeft(scrollLeft > 20);
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 20);
+    const newLeft = scrollLeft > 20;
+    const newRight = scrollLeft < scrollWidth - clientWidth - 20;
+    setCanScrollLeft((prev) => (prev !== newLeft ? newLeft : prev));
+    setCanScrollRight((prev) => (prev !== newRight ? newRight : prev));
     const maxScroll = scrollWidth - clientWidth;
     if (maxScroll > 0) {
-      setScrollProgress(Math.min(100, Math.max(0, (scrollLeft / maxScroll) * 100)));
+      const newProgress = Math.min(100, Math.max(0, (scrollLeft / maxScroll) * 100));
+      setScrollProgress((prev) => (Math.abs(prev - newProgress) > 2 ? newProgress : prev));
     } else {
       setScrollProgress(100);
     }
@@ -232,26 +289,6 @@ export const UpcomingEventsSection = () => {
     };
   }, [selectedCity, selectedCategory]);
 
-  // Attach non-passive wheel event listener for effortless horizontal mouse-wheel scrolling
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const handleWheel = (e) => {
-      // If mostly vertical wheel scroll, translate into horizontal scroll
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault();
-        container.scrollLeft += e.deltaY * 1.3;
-        updateScrollState();
-      }
-    };
-
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      container.removeEventListener('wheel', handleWheel);
-    };
-  }, [loading, events]);
-
   // Click & Drag-to-Scroll Handlers
   const handleMouseDown = (e) => {
     const el = scrollContainerRef.current;
@@ -272,15 +309,20 @@ export const UpcomingEventsSection = () => {
       hasDraggedRef.current = true;
     }
     el.scrollLeft = scrollLeftRef.current - walk;
-    updateScrollState();
   };
 
   const handleMouseUp = () => {
-    isMouseDownRef.current = false;
+    if (isMouseDownRef.current) {
+      isMouseDownRef.current = false;
+      updateScrollState();
+    }
   };
 
   const handleMouseLeave = () => {
-    isMouseDownRef.current = false;
+    if (isMouseDownRef.current) {
+      isMouseDownRef.current = false;
+      updateScrollState();
+    }
   };
 
   const scroll = (direction) => {
@@ -456,7 +498,7 @@ export const UpcomingEventsSection = () => {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
-            className="flex gap-5 sm:gap-6 overflow-x-auto scroll-smooth pb-4 px-1 pr-16 sm:pr-24 lg:pr-32 select-none cursor-grab active:cursor-grabbing"
+            className="flex gap-5 sm:gap-6 overflow-x-auto pb-4 px-1 pr-16 sm:pr-24 lg:pr-32 select-none cursor-grab active:cursor-grabbing overscroll-x-contain touch-pan-y"
             style={{
               scrollbarWidth: 'thin',
               scrollbarColor: '#f5a623 #11131c',

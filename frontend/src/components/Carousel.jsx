@@ -32,22 +32,6 @@ export const Carousel = ({ items, selectedIndex, onSelect, headerBadge, schedule
         }
     }, [selectedIndex]);
 
-    // Translate vertical wheel scrolls to horizontal scroll inside carousel
-    useEffect(() => {
-        const el = scrollContainerRef.current;
-        if (!el) return;
-
-        const onWheel = (e) => {
-            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-                e.preventDefault();
-                el.scrollLeft += e.deltaY;
-            }
-        };
-
-        el.addEventListener('wheel', onWheel, { passive: false });
-        return () => el.removeEventListener('wheel', onWheel);
-    }, []);
-
     const handlePrev = () => {
         onSelect((selectedIndex - 1 + items.length) % items.length);
     };
@@ -86,7 +70,7 @@ export const Carousel = ({ items, selectedIndex, onSelect, headerBadge, schedule
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className="flex items-end gap-3 sm:gap-4 md:gap-5 overflow-x-auto pb-4 pt-1 px-2 no-scrollbar max-w-full w-full cursor-grab active:cursor-grabbing scroll-smooth"
+        className="flex items-end gap-3 sm:gap-4 md:gap-5 overflow-x-auto pb-4 pt-1 px-2 no-scrollbar max-w-full w-full cursor-grab active:cursor-grabbing overscroll-x-contain touch-pan-y"
       >
         {items.map((item, index) => {
             const isSelected = index === selectedIndex;

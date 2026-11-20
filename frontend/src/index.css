@@ -45,3 +45,18 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* 3D booking: checkout sheet + ticket entrances */
+@keyframes tt-sheet-in {
+  from { opacity: 0; transform: translateY(28px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes tt-ticket-in {
+  from { opacity: 0; transform: translateY(40px) rotate(-2deg) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+.tt-sheet-in { animation: tt-sheet-in 380ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.tt-ticket-in { animation: tt-ticket-in 560ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .tt-sheet-in, .tt-ticket-in { animation: none; }
+}

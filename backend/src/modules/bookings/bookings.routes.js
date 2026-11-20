@@ -13,55 +13,137 @@ const router = Router();
 // 1. Public & Customer Discovery Routes
 // ==========================================
 
-// Public: Check occupied/booked seats for a theatre, date, time or showId
+// Persistent in-memory store for occupied seats and bookings (ensures seats stay greyed out across requests even when DB is offline or for ad-hoc shows)
+const inMemoryOccupiedSeats = new Map();
+const inMemoryBookings = [];
+
+const DEFAULT_OCCUPIED_SEATS = ['B4', 'B5', 'C6', 'C7', 'D3', 'D4', 'E4'];
+
+const buildStorageKey = (theatre = '', date = '', time = '', movieId = '') => {
+  const clean = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return `${clean(theatre)}__${clean(date)}__${clean(time)}__${clean(movieId)}`;
+};
+
+// Public: Check occupied/booked seats for a theatre, date, time, movie or showId
 router.get('/occupied-seats', async (req, res, next) => {
   try {
-    const { theatre, date, time, showId } = req.query;
+    const { theatre, date, time, showId, movieId, mediaId } = req.query;
+    const targetMovieId = movieId || mediaId;
     let targetShowId = showId;
 
-    if (!targetShowId && theatre) {
-      const show = await prisma.show.findFirst({
-        where: {
-          theatre: { name: { contains: theatre, mode: 'insensitive' } }
-        },
-        orderBy: { startTime: 'asc' }
-      });
-      if (show) targetShowId = show.id;
-    }
+    const occupiedSet = new Set(DEFAULT_OCCUPIED_SEATS);
 
-    if (!targetShowId) {
-      const firstShow = await prisma.show.findFirst();
-      if (firstShow) targetShowId = firstShow.id;
+    // 1. Gather all occupied seats from in-memory cache
+    if (theatre || date || time || targetMovieId) {
+      const specificKey = buildStorageKey(theatre, date, time, targetMovieId);
+      if (inMemoryOccupiedSeats.has(specificKey)) {
+        inMemoryOccupiedSeats.get(specificKey).forEach((s) => occupiedSet.add(s));
+      }
+
+      const timeKey = buildStorageKey(theatre, date, time, '');
+      if (inMemoryOccupiedSeats.has(timeKey)) {
+        inMemoryOccupiedSeats.get(timeKey).forEach((s) => occupiedSet.add(s));
+      }
+
+      if (theatre) {
+        const theatreKey = buildStorageKey(theatre, '', '', '');
+        if (inMemoryOccupiedSeats.has(theatreKey)) {
+          inMemoryOccupiedSeats.get(theatreKey).forEach((s) => occupiedSet.add(s));
+        }
+      }
     }
 
     if (targetShowId) {
-      const seatStatuses = await prisma.showSeatStatus.findMany({
-        where: {
-          showId: targetShowId,
-          OR: [
-            { status: 'BOOKED' },
-            { status: 'UNAVAILABLE' },
-            {
-              lockedByUserId: { not: null },
-              lockExpiresAt: { gt: new Date() }
-            }
-          ]
-        },
-        include: { seat: true }
-      });
-
-      const occupied = seatStatuses.map(s => {
-        if (s.seat) return `${s.seat.rowLabel}${s.seat.seatNumber}`;
-        return s.seatId;
-      });
-
-      return res.json({ success: true, occupiedSeats: occupied });
+      const showKey = `show_${targetShowId}`;
+      if (inMemoryOccupiedSeats.has(showKey)) {
+        inMemoryOccupiedSeats.get(showKey).forEach((s) => occupiedSet.add(s));
+      }
     }
 
-    return res.json({ success: true, occupiedSeats: ['B4', 'B5', 'C6', 'C7', 'D3', 'D4', 'E4'] });
+    // Also match against any recorded inMemoryBookings
+    inMemoryBookings.forEach((b) => {
+      const matchTheatre = !theatre || !b.theatreName ||
+        b.theatreName.toLowerCase().includes(theatre.toLowerCase()) ||
+        theatre.toLowerCase().includes(b.theatreName.toLowerCase());
+      const matchDate = !date || !b.date ||
+        b.date.toLowerCase().includes(date.toLowerCase()) ||
+        date.toLowerCase().includes(b.date.toLowerCase());
+      const matchTime = !time || !b.time ||
+        b.time.toLowerCase().includes(time.toLowerCase()) ||
+        time.toLowerCase().includes(b.time.toLowerCase());
+      const matchMovie = !targetMovieId || !b.mediaId ||
+        String(b.mediaId).toLowerCase() === String(targetMovieId).toLowerCase();
+
+      if (matchTheatre && matchDate && matchTime && matchMovie) {
+        (b.seats || []).forEach((s) => occupiedSet.add(s));
+      }
+    });
+
+    // 2. Query the MongoDB database (via Prisma) if connected
+    try {
+      if (!targetShowId && theatre) {
+        const whereClause = {
+          theatre: { name: { contains: theatre, mode: 'insensitive' } }
+        };
+        if (targetMovieId) {
+          whereClause.movie = {
+            OR: [
+              { id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetMovieId) ? targetMovieId : undefined },
+              { title: { contains: targetMovieId.replace(/[-_]/g, ' '), mode: 'insensitive' } }
+            ].filter(Boolean)
+          };
+        }
+        const show = await prisma.show.findFirst({
+          where: whereClause,
+          orderBy: { startTime: 'asc' }
+        });
+        if (show) targetShowId = show.id;
+      }
+
+      if (!targetShowId && targetMovieId) {
+        const show = await prisma.show.findFirst({
+          where: {
+            movie: {
+              OR: [
+                { id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetMovieId) ? targetMovieId : undefined },
+                { title: { contains: targetMovieId.replace(/[-_]/g, ' '), mode: 'insensitive' } }
+              ].filter(Boolean)
+            }
+          },
+          orderBy: { startTime: 'asc' }
+        });
+        if (show) targetShowId = show.id;
+      }
+
+      if (targetShowId) {
+        const seatStatuses = await prisma.showSeatStatus.findMany({
+          where: {
+            showId: targetShowId,
+            OR: [
+              { status: 'BOOKED' },
+              { status: 'UNAVAILABLE' },
+              {
+                lockedByUserId: { not: null },
+                lockExpiresAt: { gt: new Date() }
+              }
+            ]
+          },
+          include: { seat: true }
+        });
+
+        seatStatuses.forEach((s) => {
+          if (s.seat) occupiedSet.add(`${s.seat.rowLabel}${s.seat.seatNumber}`);
+          else if (s.seatId) occupiedSet.add(s.seatId);
+        });
+      }
+    } catch (dbErr) {
+      // Database query failed or offline - in-memory results preserved
+    }
+
+    return res.json({ success: true, occupiedSeats: Array.from(occupiedSet) });
   } catch (err) {
-    console.warn('[Bookings] DB query failed for occupied seats, returning defaults:', err.message);
-    return res.json({ success: true, occupiedSeats: ['B4', 'B5', 'C6', 'C7', 'D3', 'D4', 'E4'] });
+    console.warn('[Bookings] Error retrieving occupied seats, returning defaults:', err.message);
+    return res.json({ success: true, occupiedSeats: DEFAULT_OCCUPIED_SEATS });
   }
 });
 
@@ -92,7 +174,7 @@ router.post('/', authenticate, async (req, res, next) => {
     const amountVal = Number(totalAmount) || 76.0;
     const amountCents = Math.round(amountVal * 100);
 
-    // Resolve Show & Database Record if Postgres is available
+    // Resolve Show & Database Record if the database is available
     let show = null;
     let createdBooking = null;
 
@@ -172,6 +254,20 @@ router.post('/', authenticate, async (req, res, next) => {
                   seatNumber: parseInt(match[2], 10)
                 }
               });
+              if (!seatRecord) {
+                try {
+                  seatRecord = await tx.seat.create({
+                    data: {
+                      screenId: show.screenId,
+                      rowLabel: match[1].toUpperCase(),
+                      seatNumber: parseInt(match[2], 10),
+                      tier: match[1].toUpperCase() >= 'E' ? 'RECLINER' : match[1].toUpperCase() >= 'C' ? 'PREMIUM' : 'NORMAL',
+                      gridX: parseInt(match[2], 10),
+                      gridY: match[1].toUpperCase().charCodeAt(0) - 64
+                    }
+                  });
+                } catch {}
+              }
             } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) {
               seatRecord = await tx.seat.findUnique({ where: { id: s } });
             }
@@ -220,6 +316,7 @@ router.post('/', authenticate, async (req, res, next) => {
 
     const finalRecord = {
       orderId: bookingReference,
+      userId,
       mediaId: mediaId || show?.movie?.id || 'the-batman',
       theatreName: theatreName || show?.theatre?.name || 'IMAX Pavilion Elite KL',
       date: date || 'Tomorrow, Oct 8',
@@ -235,6 +332,46 @@ router.post('/', authenticate, async (req, res, next) => {
       posterImage: show?.movie?.posterUrl || '/images/movies/the-batman.jpg'
     };
 
+    // Guarantee seats are immediately registered in in-memory store so occupied-seats returns them
+    const seatArray = finalRecord.seats;
+    if (seatArray && seatArray.length > 0) {
+      const specificKey = buildStorageKey(finalRecord.theatreName, finalRecord.date, finalRecord.time, finalRecord.mediaId);
+      const set1 = inMemoryOccupiedSeats.get(specificKey) || new Set(DEFAULT_OCCUPIED_SEATS);
+      seatArray.forEach((s) => set1.add(s));
+      inMemoryOccupiedSeats.set(specificKey, set1);
+
+      if (finalRecord.theatreName && finalRecord.date && finalRecord.time) {
+        const timeKey = buildStorageKey(finalRecord.theatreName, finalRecord.date, finalRecord.time, '');
+        const set2 = inMemoryOccupiedSeats.get(timeKey) || new Set();
+        seatArray.forEach((s) => set2.add(s));
+        inMemoryOccupiedSeats.set(timeKey, set2);
+      }
+
+      if (finalRecord.theatreName) {
+        const theatreKey = buildStorageKey(finalRecord.theatreName, '', '', '');
+        const set3 = inMemoryOccupiedSeats.get(theatreKey) || new Set();
+        seatArray.forEach((s) => set3.add(s));
+        inMemoryOccupiedSeats.set(theatreKey, set3);
+      }
+
+      if (show?.id || directShowId) {
+        const showKey = `show_${show?.id || directShowId}`;
+        const set4 = inMemoryOccupiedSeats.get(showKey) || new Set();
+        seatArray.forEach((s) => set4.add(s));
+        inMemoryOccupiedSeats.set(showKey, set4);
+      }
+    }
+
+    inMemoryBookings.unshift(finalRecord);
+
+    io.emit('seat:booked', {
+      theatre: finalRecord.theatreName,
+      date: finalRecord.date,
+      time: finalRecord.time,
+      movieId: finalRecord.mediaId,
+      seats: finalRecord.seats
+    });
+
     res.status(201).json({
       success: true,
       orderId: bookingReference,
@@ -242,6 +379,45 @@ router.post('/', authenticate, async (req, res, next) => {
       dbBookingId: createdBooking?.id
     });
   } catch (err) { next(err); }
+});
+
+// Explicit confirmation endpoint for payment gateways & client checkouts
+router.post('/confirm', optionalAuthenticate, async (req, res, next) => {
+  try {
+    const { orderId, seats = [], theatreName, date, time, mediaId } = req.body;
+    if (seats.length > 0) {
+      const specificKey = buildStorageKey(theatreName, date, time, mediaId);
+      const set1 = inMemoryOccupiedSeats.get(specificKey) || new Set(DEFAULT_OCCUPIED_SEATS);
+      seats.forEach((s) => set1.add(s));
+      inMemoryOccupiedSeats.set(specificKey, set1);
+
+      if (theatreName && date && time) {
+        const timeKey = buildStorageKey(theatreName, date, time, '');
+        const set2 = inMemoryOccupiedSeats.get(timeKey) || new Set();
+        seats.forEach((s) => set2.add(s));
+        inMemoryOccupiedSeats.set(timeKey, set2);
+      }
+
+      if (theatreName) {
+        const theatreKey = buildStorageKey(theatreName, '', '', '');
+        const set3 = inMemoryOccupiedSeats.get(theatreKey) || new Set();
+        seats.forEach((s) => set3.add(s));
+        inMemoryOccupiedSeats.set(theatreKey, set3);
+      }
+    }
+
+    // Mark confirmed in inMemoryBookings
+    if (orderId) {
+      const existing = inMemoryBookings.find((b) => b.orderId === orderId);
+      if (existing) {
+        existing.status = 'CONFIRMED';
+      }
+    }
+
+    res.json({ success: true, message: 'Seats confirmed and locked as occupied' });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // List bookings: If customer, return their bookings; if manager, return theatre bookings
@@ -264,56 +440,87 @@ router.get('/', optionalAuthenticate, async (req, res, next) => {
     }
 
     // Default to user's bookings
-    const where = userId ? { userId } : {};
-    const bookings = await prisma.booking.findMany({
-      where,
-      include: {
-        show: { include: { movie: true, screen: true, theatre: true } },
-        seats: { include: { seat: true } },
-        payments: true
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50
+    let dbFormatted = [];
+    try {
+      const where = userId ? { userId } : {};
+      const bookings = await prisma.booking.findMany({
+        where,
+        include: {
+          show: { include: { movie: true, screen: true, theatre: true } },
+          seats: { include: { seat: true } },
+          payments: true
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      });
+
+      dbFormatted = bookings.map(b => ({
+        orderId: b.bookingReference,
+        userId: b.userId,
+        mediaId: b.show?.movie?.id || 'movie',
+        title: b.show?.movie?.title || 'Cinema Ticket',
+        theatreName: b.show?.theatre?.name || 'CineVerse Theatre',
+        date: b.show?.startTime ? new Date(b.show.startTime).toLocaleDateString() : 'Today',
+        time: b.show?.startTime ? new Date(b.show.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '06:30 PM',
+        seats: b.seats?.map(s => s.seat ? `${s.seat.rowLabel}${s.seat.seatNumber}` : s.seatId) || [],
+        totalAmount: (b.totalAmountCents || 0) / 100,
+        status: b.status,
+        posterImage: b.show?.movie?.posterUrl || '/images/movies/the-batman.jpg',
+        createdAt: b.createdAt.toISOString(),
+        qrCodeData: `https://cinepass.my/verify/${b.bookingReference}`
+      }));
+    } catch {
+      // Database offline, fall back to in-memory bookings
+    }
+
+    // Merge in-memory bookings
+    const seenOrderIds = new Set(dbFormatted.map((b) => b.orderId));
+    const userInMemory = userId
+      ? inMemoryBookings.filter((b) => !b.userId || b.userId === userId)
+      : inMemoryBookings;
+
+    const merged = [...dbFormatted];
+    userInMemory.forEach((b) => {
+      if (!seenOrderIds.has(b.orderId)) {
+        merged.push(b);
+        seenOrderIds.add(b.orderId);
+      }
     });
 
-    const formatted = bookings.map(b => ({
-      orderId: b.bookingReference,
-      mediaId: b.show?.movie?.id || 'movie',
-      title: b.show?.movie?.title || 'Cinema Ticket',
-      theatreName: b.show?.theatre?.name || 'CineVerse Theatre',
-      date: b.show?.startTime ? new Date(b.show.startTime).toLocaleDateString() : 'Today',
-      time: b.show?.startTime ? new Date(b.show.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '06:30 PM',
-      seats: b.seats?.map(s => s.seat ? `${s.seat.rowLabel}${s.seat.seatNumber}` : s.seatId) || [],
-      totalAmount: (b.totalAmountCents || 0) / 100,
-      status: b.status,
-      posterImage: b.show?.movie?.posterUrl || '/images/movies/the-batman.jpg',
-      createdAt: b.createdAt.toISOString(),
-      qrCodeData: `https://cinepass.my/verify/${b.bookingReference}`
-    }));
-
-    res.json(formatted);
+    res.json(merged);
   } catch (err) {
-    console.warn('[Bookings] DB offline, returning empty bookings list:', err.message);
-    res.json([]);
+    console.warn('[Bookings] Error fetching bookings, returning in-memory:', err.message);
+    res.json(inMemoryBookings);
   }
 });
 
 // Authenticated user's bookings with rich relations
 router.get('/my', authenticate, async (req, res, next) => {
   try {
-    const bookings = await prisma.booking.findMany({
-      where: { userId: req.user.id },
-      include: {
-        show: { include: { movie: true, screen: true, theatre: true } },
-        seats: { include: { seat: true } },
-        payments: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json({ success: true, data: bookings });
+    let dbBookings = [];
+    try {
+      dbBookings = await prisma.booking.findMany({
+        where: { userId: req.user.id },
+        include: {
+          show: { include: { movie: true, screen: true, theatre: true } },
+          seats: { include: { seat: true } },
+          payments: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    } catch {
+      // Database offline
+    }
+
+    const seenOrderIds = new Set(dbBookings.map((b) => b.bookingReference));
+    const matchingInMemory = inMemoryBookings
+      .filter((b) => !b.userId || b.userId === req.user.id)
+      .filter((b) => !seenOrderIds.has(b.orderId));
+
+    res.json({ success: true, data: [...dbBookings, ...matchingInMemory] });
   } catch (err) {
-    console.warn('[Bookings] DB offline, returning empty my-bookings list:', err.message);
-    res.json({ success: true, data: [] });
+    console.warn('[Bookings] Error retrieving user bookings:', err.message);
+    res.json({ success: true, data: inMemoryBookings });
   }
 });
 
@@ -446,28 +653,22 @@ router.post('/:id/mock-payment', authenticate, requirePermission(['BOOK_TICKETS'
         const sortedSeatIds = booking.seats.map(s => s.seatId).sort();
 
         for (const seatId of sortedSeatIds) {
-          const rows = await tx.$queryRaw`
-            SELECT id, status, locked_by_user_id, lock_expires_at 
-            FROM show_seat_status 
-            WHERE show_id = ${booking.showId}::uuid AND seat_id = ${seatId}::uuid 
-            FOR UPDATE
-          `;
-          
-          if (rows.length === 0) {
-            throw new AppError(404, 'Seat status not found');
-          }
+          // Conditional update replaces SELECT ... FOR UPDATE: it only matches while
+          // this user still holds the lock, and MongoDB aborts the transaction on a
+          // concurrent write to the same document.
+          const { count } = await tx.showSeatStatus.updateMany({
+            where: { showId: booking.showId, seatId, lockedByUserId: userId },
+            data: { status: 'BOOKED', lockedByUserId: null, lockExpiresAt: null }
+          });
 
-          const seatStatus = rows[0];
-
-          if (seatStatus.locked_by_user_id !== userId) {
+          if (count === 0) {
+            const exists = await tx.showSeatStatus.findUnique({
+              where: { showId_seatId: { showId: booking.showId, seatId } },
+              select: { id: true }
+            });
+            if (!exists) throw new AppError(404, 'Seat status not found');
             throw new AppError(409, 'Lock lost before payment completion');
           }
-
-          await tx.$queryRaw`
-            UPDATE show_seat_status
-            SET status = 'BOOKED', locked_by_user_id = NULL, lock_expires_at = NULL
-            WHERE id = ${seatStatus.id}::uuid
-          `;
         }
 
         await tx.booking.update({
@@ -508,28 +709,18 @@ router.post('/:id/mock-payment', authenticate, requirePermission(['BOOK_TICKETS'
       await prisma.$transaction(async (tx) => {
         await tx.booking.update({
           where: { id: bookingId },
-          data: { status: 'FAILED' }
+          // BookingStatus has no FAILED value; a failed payment cancels the booking.
+          data: { status: 'CANCELLED' }
         });
 
-        for (const bs of booking.seats) {
-          const rows = await tx.$queryRaw`
-            SELECT id, locked_by_user_id, lock_expires_at 
-            FROM show_seat_status 
-            WHERE show_id = ${booking.showId}::uuid AND seat_id = ${bs.seatId}::uuid 
-            FOR UPDATE
-          `;
-          
-          if (rows.length > 0) {
-             const seatStatus = rows[0];
-             if (seatStatus.locked_by_user_id === userId) {
-               await tx.$queryRaw`
-                 UPDATE show_seat_status
-                 SET locked_by_user_id = NULL, lock_expires_at = NULL
-                 WHERE id = ${seatStatus.id}::uuid
-               `;
-             }
-          }
-        }
+        await tx.showSeatStatus.updateMany({
+          where: {
+            showId: booking.showId,
+            seatId: { in: booking.seats.map(bs => bs.seatId) },
+            lockedByUserId: userId
+          },
+          data: { lockedByUserId: null, lockExpiresAt: null }
+        });
       });
       
       for (const bs of booking.seats) {
@@ -579,14 +770,10 @@ router.post('/:id/cancel', authenticate, async (req, res, next) => {
     if (booking.qrScanStatus === 'USED') throw new AppError(400, 'Cannot cancel a used ticket');
 
     await prisma.$transaction(async (tx) => {
-      const sortedSeatIds = booking.seats.map(s => s.seatId).sort();
-      for (const seatId of sortedSeatIds) {
-        await tx.$queryRaw`
-          UPDATE show_seat_status
-          SET status = 'AVAILABLE', locked_by_user_id = NULL, lock_expires_at = NULL
-          WHERE show_id = ${booking.showId}::uuid AND seat_id = ${seatId}::uuid
-        `;
-      }
+      await tx.showSeatStatus.updateMany({
+        where: { showId: booking.showId, seatId: { in: booking.seats.map(s => s.seatId) } },
+        data: { status: 'AVAILABLE', lockedByUserId: null, lockExpiresAt: null }
+      });
 
       await tx.refund.create({
         data: {

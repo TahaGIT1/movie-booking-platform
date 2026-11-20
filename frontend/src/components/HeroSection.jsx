@@ -47,10 +47,16 @@ export const HeroSection = ({ config, onOpenBooking, onPlayTrailer, onStatusCate
         className="relative w-full min-h-[calc(100vh-5rem)] flex flex-col justify-between overflow-hidden"
     >
       {/* Background Image with Cinematic Gradient Overlays */}
-      <div className="absolute inset-0 z-0">
-        <img src={currentItem.backdropImage || currentItem.posterImage || '/images/backgrounds/batman_hero.jpg'} alt={currentItem.title || 'Movie'} key={currentItem.backdropImage || currentItem.id} className="w-full h-full object-cover object-center animate-in fade-in duration-700 transform scale-105" onError={(e) => {
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <img 
+          src={currentItem.backdropImage || currentItem.posterImage || '/images/backgrounds/batman_hero.jpg'} 
+          alt={currentItem.title || 'Movie'} 
+          decoding="async"
+          className="w-full h-full object-cover object-center transition-all duration-700 ease-out transform scale-105" 
+          onError={(e) => {
             e.target.src = '/images/backgrounds/batman_hero.jpg';
-        }}/>
+          }}
+        />
 
         {/* Gradients to match Figma reference visual atmosphere */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#0a0b0e] via-[#0a0b0e]/85 to-transparent/30"/>

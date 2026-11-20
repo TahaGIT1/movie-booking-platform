@@ -4,6 +4,7 @@ import { TicketQr } from '../components/TicketQr';
 import { buildTicketPayload } from '../utils/qrGenerator';
 import { ArrowLeft, MapPin, Calendar, Clock, Lock, CreditCard, Smartphone, Building2, AlertCircle, Loader2, Check, Download, Ticket as TicketIcon, } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 /** Convenience fee added for card payments, mirroring a real gateway. */
 const CARD_CONVENIENCE_FEE = 1.5;
 const PROCESSING_DELAY_MS = 2200;
@@ -157,6 +158,7 @@ export const PaymentPage = () => {
                 title: booking.title,
                 posterImage: booking.posterImage,
             };
+            await api.recordConfirmedBooking(record);
             setPaidBooking(record);
         }
         catch (err) {

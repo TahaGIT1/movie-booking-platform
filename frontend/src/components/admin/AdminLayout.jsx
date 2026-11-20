@@ -12,6 +12,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDashboardDrawer, DashboardMobileBar } from '../layout/DashboardDrawer';
 
 export const AdminLayout = () => {
   const location = useLocation();
@@ -19,6 +20,7 @@ export const AdminLayout = () => {
   const { user, logout, openAuthModal } = useAuth();
 
   const isAdmin = user && user.role === 'SUPER_ADMIN';
+  const drawer = useDashboardDrawer();
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -30,8 +32,8 @@ export const AdminLayout = () => {
 
   return (
     <div className="flex h-screen bg-[#0a0b0e] text-white overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-64 bg-black border-r border-white/10 flex flex-col z-10 shrink-0">
+      {/* Sidebar: static on desktop, slide-in drawer below lg */}
+      <div className={`w-64 bg-black border-r border-white/10 flex flex-col shrink-0 ${drawer.sidebarClassName}`}>
         <div className="p-6 border-b border-white/10">
           <Link to="/" className="block">
             <img src="/ticket-total-logo.png" alt="Ticket Total" className="h-9 w-auto object-contain drop-shadow-md" />
@@ -105,7 +107,9 @@ export const AdminLayout = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto bg-[#0a0b0e] p-6 sm:p-8">
+      <div className="flex-1 min-w-0 overflow-y-auto bg-[#0a0b0e]">
+        <DashboardMobileBar label="Admin" isOpen={drawer.isOpen} onOpen={drawer.open} onClose={drawer.close} />
+        <div className="p-4 sm:p-6 lg:p-8">
         {!isAdmin ? (
           <div className="max-w-md mx-auto my-16 bg-neutral-900/60 border border-white/10 rounded-3xl p-8 sm:p-10 shadow-2xl text-center space-y-6 animate-in fade-in duration-300">
             <div className="w-16 h-16 rounded-2xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 flex items-center justify-center mx-auto shadow-inner">
@@ -135,6 +139,7 @@ export const AdminLayout = () => {
         ) : (
           <Outlet />
         )}
+        </div>
       </div>
     </div>
   );

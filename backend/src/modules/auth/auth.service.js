@@ -332,6 +332,31 @@ export const register = async (data) => {
   }
 };
 
+/**
+ * Store a seed / locally provisioned account in the database so its id passes the
+ * authenticate middleware (which loads req.user from the DB) and can own bookings.
+ * If the database is unreachable, the in-memory account is returned unchanged.
+ */
+const persistFallbackUser = async (fallbackUser, plainPassword) => {
+  try {
+    const passwordHash = fallbackUser.passwordHash || await bcrypt.hash(plainPassword, 10);
+    return await prisma.user.upsert({
+      where: { email: fallbackUser.email.toLowerCase() },
+      update: {},
+      create: {
+        id: fallbackUser.id,
+        email: fallbackUser.email.toLowerCase(),
+        fullName: fallbackUser.fullName || 'Member',
+        role: fallbackUser.role || 'CUSTOMER',
+        passwordHash
+      }
+    });
+  } catch (err) {
+    console.warn('[AuthService] Could not persist fallback account, using offline session:', err.message);
+    return fallbackUser;
+  }
+};
+
 export const login = async (data) => {
   const normalizedEmail = data.email.trim().toLowerCase();
   let user = null;
@@ -349,7 +374,10 @@ export const login = async (data) => {
       throw new AppError(403, 'Account is blocked', 'ACCOUNT_BLOCKED');
     }
 
-    const isValid = await bcrypt.compare(data.password, user.passwordHash);
+    // Demo seed accounts (e.g. andrew@gmail.com) keep accepting their listed demo passwords
+    // after being persisted to the database on first login.
+    const demoPasswords = DEFAULT_USERS.find(u => u.email.toLowerCase() === normalizedEmail)?.passwords || [];
+    const isValid = demoPasswords.includes(data.password) || await bcrypt.compare(data.password, user.passwordHash);
     if (!isValid) {
       try {
         await prisma.user.update({
@@ -409,8 +437,10 @@ export const login = async (data) => {
       throw new AppError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
     }
 
-    const tokens = generateTokens(seedUser.id, seedUser.role, { fullName: seedUser.fullName, email: seedUser.email });
-    const { passwords: _, passwordHash: __, ...safeUser } = seedUser;
+    const storedUser = await persistFallbackUser(seedUser, data.password);
+    const sessionUser = { ...seedUser, id: storedUser.id, role: storedUser.role || seedUser.role };
+    const tokens = generateTokens(sessionUser.id, sessionUser.role, { fullName: sessionUser.fullName, email: sessionUser.email });
+    const { passwords: _, passwordHash: __, ...safeUser } = sessionUser;
     return { user: safeUser, ...tokens };
   }
 
@@ -428,8 +458,10 @@ export const login = async (data) => {
       passwordHash: await bcrypt.hash(data.password, 10),
     };
     saveLocalUser(autoUser);
-    const tokens = generateTokens(autoUser.id, autoUser.role, { fullName: autoUser.fullName, email: autoUser.email });
-    const { passwordHash: __, ...safeUser } = autoUser;
+    const storedUser = await persistFallbackUser(autoUser, data.password);
+    const sessionUser = { ...autoUser, id: storedUser.id, role: storedUser.role || autoUser.role };
+    const tokens = generateTokens(sessionUser.id, sessionUser.role, { fullName: sessionUser.fullName, email: sessionUser.email });
+    const { passwordHash: __, ...safeUser } = sessionUser;
     return { user: safeUser, ...tokens };
   }
 
