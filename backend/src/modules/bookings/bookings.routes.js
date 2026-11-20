@@ -79,7 +79,7 @@ router.get('/occupied-seats', async (req, res, next) => {
       }
     });
 
-    // 2. Query Prisma Postgres database if connected
+    // 2. Query the MongoDB database (via Prisma) if connected
     try {
       if (!targetShowId && theatre) {
         const whereClause = {
@@ -137,7 +137,7 @@ router.get('/occupied-seats', async (req, res, next) => {
         });
       }
     } catch (dbErr) {
-      // Postgres query failed or offline - in-memory results preserved
+      // Database query failed or offline - in-memory results preserved
     }
 
     return res.json({ success: true, occupiedSeats: Array.from(occupiedSet) });
@@ -174,7 +174,7 @@ router.post('/', authenticate, async (req, res, next) => {
     const amountVal = Number(totalAmount) || 76.0;
     const amountCents = Math.round(amountVal * 100);
 
-    // Resolve Show & Database Record if Postgres is available
+    // Resolve Show & Database Record if the database is available
     let show = null;
     let createdBooking = null;
 
@@ -509,7 +509,7 @@ router.get('/my', authenticate, async (req, res, next) => {
         orderBy: { createdAt: 'desc' }
       });
     } catch {
-      // Postgres offline
+      // Database offline
     }
 
     const seenOrderIds = new Set(dbBookings.map((b) => b.bookingReference));
@@ -653,28 +653,22 @@ router.post('/:id/mock-payment', authenticate, requirePermission(['BOOK_TICKETS'
         const sortedSeatIds = booking.seats.map(s => s.seatId).sort();
 
         for (const seatId of sortedSeatIds) {
-          const rows = await tx.$queryRaw`
-            SELECT id, status, locked_by_user_id, lock_expires_at 
-            FROM show_seat_status 
-            WHERE show_id = ${booking.showId}::uuid AND seat_id = ${seatId}::uuid 
-            FOR UPDATE
-          `;
-          
-          if (rows.length === 0) {
-            throw new AppError(404, 'Seat status not found');
-          }
+          // Conditional update replaces SELECT ... FOR UPDATE: it only matches while
+          // this user still holds the lock, and MongoDB aborts the transaction on a
+          // concurrent write to the same document.
+          const { count } = await tx.showSeatStatus.updateMany({
+            where: { showId: booking.showId, seatId, lockedByUserId: userId },
+            data: { status: 'BOOKED', lockedByUserId: null, lockExpiresAt: null }
+          });
 
-          const seatStatus = rows[0];
-
-          if (seatStatus.locked_by_user_id !== userId) {
+          if (count === 0) {
+            const exists = await tx.showSeatStatus.findUnique({
+              where: { showId_seatId: { showId: booking.showId, seatId } },
+              select: { id: true }
+            });
+            if (!exists) throw new AppError(404, 'Seat status not found');
             throw new AppError(409, 'Lock lost before payment completion');
           }
-
-          await tx.$queryRaw`
-            UPDATE show_seat_status
-            SET status = 'BOOKED', locked_by_user_id = NULL, lock_expires_at = NULL
-            WHERE id = ${seatStatus.id}::uuid
-          `;
         }
 
         await tx.booking.update({
@@ -715,28 +709,18 @@ router.post('/:id/mock-payment', authenticate, requirePermission(['BOOK_TICKETS'
       await prisma.$transaction(async (tx) => {
         await tx.booking.update({
           where: { id: bookingId },
-          data: { status: 'FAILED' }
+          // BookingStatus has no FAILED value; a failed payment cancels the booking.
+          data: { status: 'CANCELLED' }
         });
 
-        for (const bs of booking.seats) {
-          const rows = await tx.$queryRaw`
-            SELECT id, locked_by_user_id, lock_expires_at 
-            FROM show_seat_status 
-            WHERE show_id = ${booking.showId}::uuid AND seat_id = ${bs.seatId}::uuid 
-            FOR UPDATE
-          `;
-          
-          if (rows.length > 0) {
-             const seatStatus = rows[0];
-             if (seatStatus.locked_by_user_id === userId) {
-               await tx.$queryRaw`
-                 UPDATE show_seat_status
-                 SET locked_by_user_id = NULL, lock_expires_at = NULL
-                 WHERE id = ${seatStatus.id}::uuid
-               `;
-             }
-          }
-        }
+        await tx.showSeatStatus.updateMany({
+          where: {
+            showId: booking.showId,
+            seatId: { in: booking.seats.map(bs => bs.seatId) },
+            lockedByUserId: userId
+          },
+          data: { lockedByUserId: null, lockExpiresAt: null }
+        });
       });
       
       for (const bs of booking.seats) {
@@ -786,14 +770,10 @@ router.post('/:id/cancel', authenticate, async (req, res, next) => {
     if (booking.qrScanStatus === 'USED') throw new AppError(400, 'Cannot cancel a used ticket');
 
     await prisma.$transaction(async (tx) => {
-      const sortedSeatIds = booking.seats.map(s => s.seatId).sort();
-      for (const seatId of sortedSeatIds) {
-        await tx.$queryRaw`
-          UPDATE show_seat_status
-          SET status = 'AVAILABLE', locked_by_user_id = NULL, lock_expires_at = NULL
-          WHERE show_id = ${booking.showId}::uuid AND seat_id = ${seatId}::uuid
-        `;
-      }
+      await tx.showSeatStatus.updateMany({
+        where: { showId: booking.showId, seatId: { in: booking.seats.map(s => s.seatId) } },
+        data: { status: 'AVAILABLE', lockedByUserId: null, lockExpiresAt: null }
+      });
 
       await tx.refund.create({
         data: {

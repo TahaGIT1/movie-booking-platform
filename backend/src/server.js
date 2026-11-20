@@ -19,7 +19,7 @@ const startServer = async () => {
     console.log('✅ Connected to database');
   } catch (error) {
     console.warn('⚠️ Could not connect to database at startup:', error.message);
-    console.warn('💡 Please verify your DATABASE_URL in backend/.env (e.g. Neon PostgreSQL)');
+    console.warn('💡 Please verify your DATABASE_URL in backend/.env (MongoDB Atlas connection string)');
   }
 
   httpServer.listen(env.PORT, () => {

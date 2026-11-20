@@ -213,7 +213,7 @@ export async function formatTmdbMovie(m, dbMatchesMap = null) {
   const mins = runtime % 60;
   const durationStr = `${hours}h ${mins.toString().padStart(2, '0')}m`;
 
-  // Look up if this movie exists in our PostgreSQL DB to preserve real theatre bookings
+  // Look up if this movie exists in our database to preserve real theatre bookings
   let matchedDbMovie = null;
   if (dbMatchesMap && dbMatchesMap.has(m.title.toLowerCase().trim())) {
     matchedDbMovie = dbMatchesMap.get(m.title.toLowerCase().trim());

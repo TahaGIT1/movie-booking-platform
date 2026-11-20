@@ -23,20 +23,27 @@ export const generateOtpCode = () => {
  */
 const getRecord = async (email, purpose) => {
   try {
-    const rows = await prisma.$queryRaw`
-      SELECT id, email, code, purpose, attempts, expires_at AS "expiresAt", created_at AS "createdAt"
-      FROM email_otps
-      WHERE email = ${email} AND purpose = ${purpose}
-      LIMIT 1
-    `;
-    if (rows && rows.length > 0) {
-      return rows[0];
-    }
+    const record = await prisma.emailOtp.findUnique({
+      where: { email_purpose: { email, purpose } }
+    });
+    if (record) return record;
   } catch (err) {
-    // If DB error, fall back to memory store
+    console.warn('DB OTP lookup error, using memory fallback:', err.message);
   }
 
   return otpMemoryStore.get(`${purpose}:${email}`) || null;
+};
+
+/**
+ * Create or refresh the OTP record for an email + purpose pair.
+ */
+const upsertOtpRecord = (email, purpose, code, expiresAt) => {
+  const fields = { code, attempts: 0, expiresAt, createdAt: new Date() };
+  return prisma.emailOtp.upsert({
+    where: { email_purpose: { email, purpose } },
+    create: { email, purpose, ...fields },
+    update: fields
+  });
 };
 
 /**
@@ -74,14 +81,8 @@ export const sendSignupOtp = async ({ email, fullName }) => {
     fullName: fullName || 'Movie Lover'
   });
 
-  // Persist to Neon DB
   try {
-    await prisma.$executeRaw`
-      INSERT INTO email_otps (email, code, purpose, attempts, expires_at, created_at)
-      VALUES (${normalized}, ${code}, 'SIGNUP', 0, ${expiresAt}, NOW())
-      ON CONFLICT (email, purpose)
-      DO UPDATE SET code = ${code}, attempts = 0, expires_at = ${expiresAt}, created_at = NOW()
-    `;
+    await upsertOtpRecord(normalized, 'SIGNUP', code, expiresAt);
   } catch (err) {
     console.warn('DB OTP persist error, using memory fallback:', err.message);
   }
@@ -137,14 +138,8 @@ export const sendForgotPasswordOtp = async ({ email, fullName }) => {
     fullName: fullName || 'Valued User'
   });
 
-  // Persist to Neon DB
   try {
-    await prisma.$executeRaw`
-      INSERT INTO email_otps (email, code, purpose, attempts, expires_at, created_at)
-      VALUES (${normalized}, ${code}, 'FORGOT_PASSWORD', 0, ${expiresAt}, NOW())
-      ON CONFLICT (email, purpose)
-      DO UPDATE SET code = ${code}, attempts = 0, expires_at = ${expiresAt}, created_at = NOW()
-    `;
+    await upsertOtpRecord(normalized, 'FORGOT_PASSWORD', code, expiresAt);
   } catch (err) {
     console.warn('DB OTP persist error, using memory fallback:', err.message);
   }
@@ -204,12 +199,12 @@ export const verifyOtp = async ({ email, otp, purpose, consume = true }) => {
   if (record.code !== cleanProvided) {
     const nextAttempts = (record.attempts || 0) + 1;
     try {
-      await prisma.$executeRaw`
-        UPDATE email_otps SET attempts = ${nextAttempts}
-        WHERE email = ${normalized} AND purpose = ${purpose}
-      `;
-    } catch (e) {
-      // ignore
+      await prisma.emailOtp.updateMany({
+        where: { email: normalized, purpose },
+        data: { attempts: nextAttempts }
+      });
+    } catch (err) {
+      console.warn('DB OTP attempt update error:', err.message);
     }
     const memKey = `${purpose}:${normalized}`;
     const mem = otpMemoryStore.get(memKey);
@@ -240,11 +235,9 @@ export const verifyOtp = async ({ email, otp, purpose, consume = true }) => {
  */
 const deleteRecord = async (email, purpose) => {
   try {
-    await prisma.$executeRaw`
-      DELETE FROM email_otps WHERE email = ${email} AND purpose = ${purpose}
-    `;
+    await prisma.emailOtp.deleteMany({ where: { email, purpose } });
   } catch (err) {
-    // ignore
+    console.warn('DB OTP delete error:', err.message);
   }
   otpMemoryStore.delete(`${purpose}:${email}`);
 };
