@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Calendar, MapPin, Clock, Ticket, Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useLocationContext } from '../contexts/LocationContext';
 import { useAuth } from '../contexts/AuthContext';
 
 export const BookingModal = ({ item, onClose }) => {
+    const navigate = useNavigate();
+    // Movies get the full seat-selection page (immersive 3D theatre with 2D fallback).
+    const isMovie = Boolean(item) && (item.category || 'movie') === 'movie';
+    useEffect(() => {
+        if (!isMovie) return;
+        onClose?.();
+        navigate(`/book/${encodeURIComponent(item.id)}`);
+    }, [isMovie, item?.id, navigate, onClose]);
     const { selectedCity, openLocationModal } = useLocationContext();
     const { user, openAuthModal } = useAuth();
     const [theatres, setTheatres] = useState([]);
@@ -102,7 +111,7 @@ export const BookingModal = ({ item, onClose }) => {
         };
     }, [selectedTheatre, selectedDate, selectedTime, item?.id]);
 
-    if (!item) return null;
+    if (!item || isMovie) return null;
 
     // 6 rows x 10 cols seat matrix
     const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
