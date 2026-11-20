@@ -58,7 +58,9 @@ function AppLayout() {
       {showGlobalChrome && <Navbar onOpenSearch={() => setSearchOpen(true)}/>}
 
       {/* Routes Content */}
-      <div className="flex-1 flex flex-col">
+      {/* *:w-full *:min-w-0 — centred page containers (max-w-* mx-auto) would otherwise
+          shrink-wrap to their widest child and push the page wider than the screen on phones. */}
+      <div className="flex-1 flex flex-col min-w-0 *:w-full *:min-w-0">
         <ErrorBoundary>
           <Routes>
           {/* Customer Discovery Routes */}

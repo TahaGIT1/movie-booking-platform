@@ -256,7 +256,7 @@ export const ManageMovies = () => {
             Manage Movies
           </h1>
           <p className="text-xs text-neutral-400 mt-1">
-            Create, update, and manage all cinema catalog items in the PostgreSQL database.
+            Create, update, and manage all cinema catalog items in the database.
           </p>
         </div>
         <button
@@ -437,7 +437,7 @@ export const ManageMovies = () => {
                     {editingMovieId ? 'Edit Movie' : 'Add New Movie to Database'}
                   </h3>
                   <p className="text-xs text-neutral-400">
-                    Configures all 12 schema fields directly in PostgreSQL
+                    Configures all 12 schema fields directly in the database
                   </p>
                 </div>
               </div>
