@@ -2,7 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CURVE_CENTER_Z, CURVE_RADIUS } from './lib/seatLayout';
-import { ROOM, SCREEN, STAGE, makeWoodTexture } from './lib/scene';
+import { ROOM, SCREEN, STAGE, makeWoodTexture, backWallZ as getBackWallZ } from './lib/scene';
 
 const ROW_HALF_DEPTH = 0.6;
 const STEP_HALF_ANGLE = 0.6;
@@ -56,7 +56,7 @@ function useRiserGeometry(rows) {
 
 export function AuditoriumShell({ layout }) {
     const { rows, bounds } = layout;
-    const backWallZ = bounds.backZ + 3;
+    const backWallZ = getBackWallZ(bounds);
     const roomDepth = backWallZ - ROOM.frontZ;
     const roomMidZ = (backWallZ + ROOM.frontZ) / 2;
 

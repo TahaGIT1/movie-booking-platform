@@ -77,7 +77,7 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
         shotKey.current += 1;
         const key = shotKey.current;
         if (id === 'tour') setShot({ key, tour: buildTourKeyframes(presets, layout.bounds) });
-        else if (id === 'seat') setShot({ key, ...seatViewPreset(seatById.get(seatId)) });
+        else if (id === 'seat') setShot({ key, ...seatViewPreset(seatById.get(seatId), layout.bounds) });
         else setShot({ key, ...presets[id] });
         setActive(id === 'seat' ? `seat:${seatId}` : id);
     }, [presets, layout.bounds, seatById]);
@@ -224,6 +224,7 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
                             paused={dimmed}
                             muted={isTrailerMuted || dimmed}
                             trailerLayer={trailerLayer}
+                            bottomInset={!hasSidePanel && !dimmed ? sheetHeight : 0}
                             reducedMotion={reducedMotion}
                         />
                     </div>

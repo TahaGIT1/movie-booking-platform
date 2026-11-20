@@ -16,7 +16,11 @@ const MAX_FOV = 78;
 const REFERENCE_HALF_HFOV = Math.atan(Math.tan(THREE_DEG(BASE_FOV / 2)) * REFERENCE_ASPECT);
 function THREE_DEG(deg) { return (deg * Math.PI) / 180; }
 
-/** Keeps the horizontal field of view constant as the stage gets narrower than the reference. */
+/**
+ * Keeps the horizontal field of view constant as the stage gets narrower than the reference.
+ * The responsive value is stored as camera.userData.baseFov; CameraRig may temporarily widen
+ * it (camera.userData.fovOverride) for the seat view and tweens back to the base afterwards.
+ */
 function ResponsiveFov() {
     const camera = useThree((s) => s.camera);
     const width = useThree((s) => s.size.width);
@@ -27,12 +31,35 @@ function ResponsiveFov() {
         const fov = aspect >= REFERENCE_ASPECT
             ? BASE_FOV
             : Math.min(MAX_FOV, (2 * Math.atan(Math.tan(REFERENCE_HALF_HFOV) / aspect) * 180) / Math.PI);
-        if (Math.abs(camera.fov - fov) > 0.1) {
-            camera.fov = fov;
+        camera.userData.baseFov = fov;
+        const applied = camera.userData.fovOverride ?? fov;
+        if (Math.abs(camera.fov - applied) > 0.1) {
+            camera.fov = applied;
             camera.updateProjectionMatrix();
             invalidate();
         }
     }, [camera, width, height, invalidate]);
+    return null;
+}
+
+/**
+ * The phone bottom sheet covers the lower part of the canvas. Shift the projection centre up
+ * by half the covered height (setViewOffset) so every shot is centred in the part the user can
+ * actually see, and publish the visible fraction for CameraRig's seat-view framing.
+ */
+function ViewInset({ bottomInset }) {
+    const camera = useThree((s) => s.camera);
+    const width = useThree((s) => s.size.width);
+    const height = useThree((s) => s.size.height);
+    const invalidate = useThree((s) => s.invalidate);
+    useEffect(() => {
+        const inset = Math.max(0, Math.min(bottomInset || 0, height * 0.6));
+        if (inset > 0) camera.setViewOffset(width, height, 0, inset / 2, width, height);
+        else camera.clearViewOffset();
+        camera.userData.visibleFraction = height > 0 ? (height - inset) / height : 1;
+        camera.updateProjectionMatrix();
+        invalidate();
+    }, [camera, width, height, bottomInset, invalidate]);
     return null;
 }
 
@@ -46,7 +73,7 @@ const DPR_RANGE = IS_COARSE_POINTER ? [1, 1.5] : [1, 1.75];
  */
 export function TheatreScene({
     layout, seatClasses, occupiedSet, selectedSeats, hoverId, onHover, onSelect,
-    shot, onTourEnd, initialShot, media, paused, muted, trailerLayer, reducedMotion,
+    shot, onTourEnd, initialShot, media, paused, muted, trailerLayer, reducedMotion, bottomInset = 0,
 }) {
     const classColors = useMemo(() => Object.fromEntries(seatClasses.map((c) => [c.id, c.color])), [seatClasses]);
     const midZ = (layout.bounds.frontZ + layout.bounds.backZ) / 2;
@@ -91,6 +118,7 @@ export function TheatreScene({
                 rotateSpeed={IS_COARSE_POINTER ? 0.9 : 0.6}
             />
             <ResponsiveFov />
+            <ViewInset bottomInset={bottomInset} />
             <CameraRig initialTarget={initialShot.target} shot={shot} onTourEnd={onTourEnd} reducedMotion={reducedMotion} />
         </Canvas>
     );
