@@ -116,3 +116,12 @@ export function makeTitleCardTexture(title) {
 }
 
 export const isDirectVideoUrl = (url) => typeof url === 'string' && /^https?:\/\/.+\.(mp4|webm|ogv|ogg|mov)(\?.*)?$/i.test(url);
+
+const YOUTUBE_ID_PATTERN = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+
+/** Returns the 11-character video id from any common YouTube URL, or null. */
+export const extractYouTubeId = (url) => {
+    if (typeof url !== 'string') return null;
+    if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
+    return url.match(YOUTUBE_ID_PATTERN)?.[1] || null;
+};

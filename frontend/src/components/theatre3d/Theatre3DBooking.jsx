@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Play } from 'lucide-react';
+import { Eye, Play, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../../services/api';
 import { TheatreScene } from './TheatreScene';
 import { TheatreHeader } from './TheatreHeader';
@@ -10,7 +10,7 @@ import { CheckoutSheet } from './CheckoutSheet';
 import { TicketConfirmed } from './TicketConfirmed';
 import { pickBestSeats } from './lib/seatLayout';
 import { buildCheckoutSummary, formatINR } from './lib/pricing';
-import { PRESET_IDS, PRESET_LABELS, buildCameraPresets, buildTourKeyframes, seatViewPreset } from './lib/scene';
+import { PRESET_IDS, PRESET_LABELS, buildCameraPresets, buildTourKeyframes, seatViewPreset, extractYouTubeId } from './lib/scene';
 
 const PAYMENT_DELAY_MS = 900;
 
@@ -47,6 +47,11 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
         };
     }, []);
     const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+    // Browsers only autoplay muted video; the viewer can turn the trailer sound on.
+    const [isTrailerMuted, setIsTrailerMuted] = useState(true);
+    // DOM layer behind the canvas where the trailer iframe is placed (see TrailerScreen).
+    const [trailerLayer, setTrailerLayer] = useState(null);
+    const hasTrailer = Boolean(extractYouTubeId(item.trailerUrl));
 
     /* ---------- camera ---------- */
     const presets = useMemo(() => buildCameraPresets(layout.bounds), [layout.bounds]);
@@ -183,6 +188,7 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
             <div className="relative flex-1 min-h-0 flex">
                 <div ref={stageRef} className="relative flex-1 min-w-0" onPointerLeave={() => setHoverId(null)}>
                     <div className={`absolute inset-0 transition-[filter,transform] duration-500 ${dimmed ? 'blur-md brightness-[0.35] scale-[1.02]' : ''}`}>
+                        <div ref={setTrailerLayer} className="absolute inset-0 overflow-hidden" aria-hidden="true" />
                         <TheatreScene
                             layout={layout}
                             seatClasses={seatClasses}
@@ -196,6 +202,8 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
                             initialShot={initialShot}
                             media={media}
                             paused={dimmed}
+                            muted={isTrailerMuted || dimmed}
+                            trailerLayer={trailerLayer}
                             reducedMotion={reducedMotion}
                         />
                     </div>
@@ -218,6 +226,20 @@ export default function Theatre3DBooking({ flow, onSwitchTo2D }) {
                                 </button>
                             ))}
                         </nav>
+                    )}
+
+                    {/* Trailer sound */}
+                    {!dimmed && hasTrailer && (
+                        <button
+                            type="button"
+                            onClick={() => setIsTrailerMuted((m) => !m)}
+                            aria-pressed={!isTrailerMuted}
+                            aria-label={isTrailerMuted ? 'Turn trailer sound on' : 'Mute trailer'}
+                            className={`absolute right-3 z-10 ${isWide ? 'bottom-4' : 'bottom-[150px]'} inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-black/55 border border-white/15 backdrop-blur-md text-white text-xs font-semibold hover:bg-black/75 transition cursor-pointer`}
+                        >
+                            {isTrailerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                            {isTrailerMuted ? 'Trailer sound' : 'Mute'}
+                        </button>
                     )}
 
                     {/* View from the last picked seat */}

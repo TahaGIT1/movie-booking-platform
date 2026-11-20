@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
-import { SCREEN, isDirectVideoUrl, makeTitleCardTexture } from './lib/scene';
+import { SCREEN, isDirectVideoUrl, extractYouTubeId, makeTitleCardTexture } from './lib/scene';
+import { TrailerScreen } from './TrailerScreen';
 
 const SCREEN_FPS = 24;
 const KEN_BURNS_PERIOD_S = 28;
@@ -23,11 +24,13 @@ function applyCover(tex, mediaAspect, t, kenBurns) {
 }
 
 /**
- * The cinema screen. Plays the trailer when it is a direct video file (YouTube cannot be a
- * WebGL texture), otherwise shows the backdrop with a Ken Burns drift. Renders at ~24fps
- * through invalidate() so the canvas can stay on frameloop="demand".
+ * The cinema screen. A YouTube trailer plays on top through <TrailerScreen>; a direct video
+ * file plays as a WebGL texture; otherwise (and while the trailer loads) the backdrop shows
+ * with a Ken Burns drift. Renders at ~24fps through invalidate() so the canvas can stay on
+ * frameloop="demand".
  */
-export function ScreenMesh({ videoUrl, imageUrl, fallbackImageUrl, title, paused }) {
+export function ScreenMesh({ videoUrl, imageUrl, fallbackImageUrl, title, paused, muted = true, trailerLayer }) {
+    const youtubeId = useMemo(() => extractYouTubeId(videoUrl), [videoUrl]);
     const invalidate = useThree((s) => s.invalidate);
     const [media, setMedia] = useState(null); // { texture, aspect, kind }
     const fallback = useMemo(() => makeTitleCardTexture(title), [title]);
@@ -133,6 +136,7 @@ export function ScreenMesh({ videoUrl, imageUrl, fallbackImageUrl, title, paused
                 <planeGeometry args={[SCREEN.width, SCREEN.height]} />
                 <meshBasicMaterial map={map} toneMapped={false} />
             </mesh>
+            {youtubeId && trailerLayer && <TrailerScreen videoId={youtubeId} muted={muted} paused={paused} layerEl={trailerLayer} />}
             {/* spill light from the screen onto the first rows */}
             <pointLight position={[0, -1.5, 4]} intensity={18} distance={22} decay={1.6} color="#cfe0ff" />
         </group>

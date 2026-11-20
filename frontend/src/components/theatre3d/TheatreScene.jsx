@@ -13,7 +13,7 @@ import { ROOM } from './lib/scene';
  */
 export function TheatreScene({
     layout, seatClasses, occupiedSet, selectedSeats, hoverId, onHover, onSelect,
-    shot, onTourEnd, initialShot, media, paused, reducedMotion,
+    shot, onTourEnd, initialShot, media, paused, muted, trailerLayer, reducedMotion,
 }) {
     const classColors = useMemo(() => Object.fromEntries(seatClasses.map((c) => [c.id, c.color])), [seatClasses]);
     const midZ = (layout.bounds.frontZ + layout.bounds.backZ) / 2;
@@ -36,7 +36,7 @@ export function TheatreScene({
             <pointLight position={[ROOM.halfWidth - 1.5, 7, midZ]} intensity={25} distance={26} color="#ffb070" />
 
             <AuditoriumShell layout={layout} />
-            <ScreenMesh {...media} paused={paused} />
+            <ScreenMesh {...media} paused={paused} muted={muted} trailerLayer={trailerLayer} />
             <SeatInstances
                 seats={layout.seats}
                 classColors={classColors}
